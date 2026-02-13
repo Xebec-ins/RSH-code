@@ -1,0 +1,3340 @@
+  var invoiceSheetUrl = "https://docs.google.com/spreadsheets/d/1WPFLR75pQiA5Z64cclM9DgW9vhfAryk3Z5PITmSP3mg/edit#gid=1405938810";
+  var TARGET_SPREADSHEET_ID = "1471oX-lRMFNwbmCbcFuPhg2fbbPU662qX2kQFR-r8zc";
+
+  var sheetNameServiceList = "Service List";
+  var sheetNameCustomer = "Customer";
+  var sheetNameAddress = "Address";
+  var sheetNameTeam = "Team";
+  var sheetNameOrder = "Order";
+  var sheetNameWaitlist = "Waitlist";
+  var sheetNameWaitlistWaiting = "WaitlistWaiting";
+  var sheetNameBackOrderNumber = "BackOrderNumber";
+  var sheetNameInvoice = "Invoice";
+  var sheetNameSetting = "Setting";
+  var sheetNameCompletedServices = "Completed Services";
+  var sheetNameOrderScheduled = "OrderScheduled";
+  var sheetNameOrderCompleted = "OrderCompleted";
+  var sheetNameOrderPendingPayment = "OrderPendingPayment";
+  var sheetNameRejectedOrder = "Rejected Order";
+  var sheetNameMarketingChannel = "Marketing Channel";
+  var sheetNamecopyOrderScheduled = "copyOrderScheduled";
+
+  var col_Order_OrderId = 0;
+  var col_Order_Date = 1;
+  var col_Order_Time = 2;
+  var col_Order_Duration = 3;
+  var col_Order_Phone = 4;
+  var col_Order_Name = 5;
+  var col_Order_Team = 6;
+  var col_Order_Service = 7;
+  var col_Order_Note = 8;
+  var col_Order_Status = 9;
+  var col_Order_Invoice = 10;
+  var col_Order_LabourCharge = 12;
+  var col_Order_LocationCharge = 13;
+  var col_Order_Discount = 14;
+  var col_Order_SparePart = 15;
+  var col_Order_InvoiceNumber = 16;
+  var col_Order_BuildingStreetZone = 17;
+  var col_Order_AddressLabel = 18;
+  var col_Order_AddressLink = 19;
+  var col_Order_Phone2 = 20;
+
+  var col_WaitlistWaiting_AddressLabel = 10;
+  var col_WaitlistWaiting_AddressLink = 11;
+  var col_WaitlistWaiting_Phone2 = 12;
+
+
+
+
+  function doGet() {
+
+    //return HtmlService.createHtmlOutputFromFile('coordinator').addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
+
+    return HtmlService.createTemplateFromFile('coordinator').evaluate().addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
+
+  }
+
+
+
+
+  function include(filename) {
+    return HtmlService.createHtmlOutputFromFile(filename)
+      .getContent();
+  }
+
+  function getSS() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    if (ss === null) {
+      try {
+        ss = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+      } catch (e) {
+        Logger.log("Error opening spreadsheet by ID: " + e.message);
+        throw new Error("Could not access the backend database.");
+      }
+    }
+    return ss;
+  }
+
+
+
+
+
+  function gasGetUserEmail() {
+
+    var userEmail = Session.getEffectiveUser().getEmail();
+
+    return userEmail;
+
+  }
+
+
+
+
+
+
+
+
+
+  //Get the list of auto complete items
+  function gasGetAutoCompleteList() {
+  var ss = getSS(); 
+
+  // --- Load Sheets ---
+  var sheetServiceList = ss.getSheetByName(sheetNameServiceList);
+  var dataServiceList = sheetServiceList.getDataRange().getValues();
+  var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+  var dataCustomer = sheetCustomer.getDataRange().getValues();
+  var sheetTeam = ss.getSheetByName(sheetNameTeam);
+  var dataTeam = sheetTeam.getDataRange().getValues();
+  var sheetSetting = ss.getSheetByName(sheetNameSetting);
+  
+  // --- Settings Dropdowns ---
+  var arrayRejectionReason = sheetSetting.getRange("B6").getDisplayValue().split(",");
+  var htmlRejectionReason = "<option value='Please Select'>Please select</option>";
+  for (var i in arrayRejectionReason) { htmlRejectionReason += "<option value='" + arrayRejectionReason[i] + "'>" + arrayRejectionReason[i] + "</option>" }
+
+  var arrayWhereKnow = sheetSetting.getRange("B7").getDisplayValue().split(",");
+  var htmlWhereKnow = "<option value='Please Select'>Please select</option>";
+  for (var i in arrayWhereKnow) { htmlWhereKnow += "<option value='" + arrayWhereKnow[i] + "'>" + arrayWhereKnow[i] + "</option>" }
+
+  var arrayOrderId = sheetSetting.getRange("B8").getDisplayValue().split(",");
+
+  // --- Load Order Data ---
+  var sheetOrderScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+  var dataOrderScheduled = sheetOrderScheduled.getDataRange().getValues();
+  var sheetOrderCompleted = ss.getSheetByName(sheetNameOrderCompleted);
+  var dataOrderCompleted = sheetOrderCompleted.getDataRange().getValues();
+  var sheetOrderPendingPayment = ss.getSheetByName(sheetNameOrderPendingPayment);
+  var dataOrderPendingPayment = sheetOrderPendingPayment.getDataRange().getValues();
+  var sheetWaitlistWaiting = ss.getSheetByName(sheetNameWaitlistWaiting);
+  var dataWaitlistWaiting = sheetWaitlistWaiting.getDataRange().getValues();
+
+  //Remove headers
+  dataServiceList.shift();
+  dataCustomer.shift();
+  dataTeam.shift();
+  dataOrderScheduled.shift();
+  dataOrderCompleted.shift();
+  dataOrderPendingPayment.shift();
+  dataWaitlistWaiting.shift();
+
+  // Lists
+  var arrayGeneralService = flatten(sliceArray(dataServiceList, 0, 1));
+  arrayGeneralService = unique(arrayGeneralService);
+  var arrayCustomerPhone = flatten(sliceArray(dataCustomer, 0, 1)).toString().split(",");
+  var arrayTeam = flatten(sliceArray(dataTeam, 0, 1));
+  arrayTeam.unshift("Select team");
+
+  // --- HELPER: Fix 1899 Dates & Round to Nearest 30 Mins ---
+  var safeTime = function(val) {
+      if (!val) return "";
+      if (val instanceof Date) return roundToNearest30(val); // Uses Global Rounding Helper
+      return String(val).trim();
+  };
+
+  // --- GROUPING LOGIC ---
+  var orderMap = {};
+  var orderRemainingTasks = {};
+  var orderMaxMoment = {};
+  
+  // Pass 1: Analyze tasks
+  for (var k in dataOrderScheduled) {
+    var id = String(dataOrderScheduled[k][col_Order_OrderId]).trim();
+    var status = String(dataOrderScheduled[k][col_Order_Status]).trim();
+    if (!id || id === "" || id === "#N/A") continue;
+    
+    if (status !== "Day Completed" && status !== "Completed") {
+        if (!orderRemainingTasks[id]) orderRemainingTasks[id] = 0;
+        orderRemainingTasks[id]++;
+    }
+    
+    var rawDate = dataOrderScheduled[k][col_Order_Date];
+    var endTimeStr = dataOrderScheduled[k][col_Order_Duration];
+    if (rawDate) {
+        var dateTimestamp = new Date(rawDate).getTime();
+        var endTimeMinutes = convertAmPmForSorting(endTimeStr || "0:00 AM");
+        var currentMoment = dateTimestamp + (endTimeMinutes * 60 * 1000);
+        if (!orderMaxMoment[id] || currentMoment > orderMaxMoment[id]) {
+            orderMaxMoment[id] = currentMoment;
+        }
+    }
+  }
+
+  // Pass 2: Grouping
+  for (var i in dataOrderScheduled) {
+    var row = dataOrderScheduled[i];
+    var currentId = row[col_Order_OrderId];
+    var status = row[col_Order_Status];
+    
+    if (!currentId || status === "Completed") continue;
+
+    var tasksLeft = orderRemainingTasks[currentId] || 0;
+    var thisDateTimestamp = new Date(row[col_Order_Date]).getTime();
+    var thisEndTimeMins = convertAmPmForSorting(row[col_Order_Duration] || "0:00 AM");
+    var thisMoment = thisDateTimestamp + (thisEndTimeMins * 60 * 1000);
+    var isFinal = (tasksLeft <= 1) && (thisMoment >= orderMaxMoment[currentId]);
+
+    if (!orderMap[currentId]) {
+      orderMap[currentId] = {
+        id: currentId,
+        name: row[col_Order_Name],
+        phone: row[col_Order_Phone],
+        // Default single values (will be overridden by stacked logic below)
+        dateId: Utilities.formatDate(new Date(row[col_Order_Date]), "GMT+3", "yyyy-MM-dd"),
+        tasks: []
+      };
+    }
+
+    orderMap[currentId].tasks.push({
+      team: row[col_Order_Team],
+      service: row[col_Order_Service],
+      // Use dd/MM/yy format to save space
+      date: Utilities.formatDate(new Date(row[col_Order_Date]), "GMT+3", "dd/MM/yy"), 
+      dateSort: Utilities.formatDate(new Date(row[col_Order_Date]), "GMT+3", "yyyyMMdd"), 
+      dateId: Utilities.formatDate(new Date(row[col_Order_Date]), "GMT+3", "yyyy-MM-dd"), 
+      startT: safeTime(row[col_Order_Time]), 
+      endT: safeTime(row[col_Order_Duration]),
+      status: status, 
+      isFinal: isFinal
+    });
+  }
+
+  // --- PART 2: BUILD TABLE ROWS (WITH STACKED DATES & RANGES) ---
+  var currentOrders = "";
+  for (var orderId in orderMap) {
+    var order = orderMap[orderId];
+    
+    // 1. Sort Tasks Chronologically
+    order.tasks.sort(function(a, b) {
+        return a.dateSort.localeCompare(b.dateSort);
+    });
+
+    // 2. Generate Stacked Strings (Date AND Time Range)
+    var uniqueEntries = [];
+    var seenCombo = {};
+    
+    for(var t=0; t<order.tasks.length; t++) {
+        var task = order.tasks[t];
+        
+        // Key includes Date + Start + End (So if Team 1 & 2 have same time, we only show 1 line)
+        var key = task.date + "_" + task.startT + "_" + task.endT;
+        
+        if(!seenCombo[key]) {
+            // FIX: Create the Range String here (Start - End)
+            var rangeStr = task.startT + " - " + task.endT;
+            uniqueEntries.push({ date: task.date, time: rangeStr });
+            seenCombo[key] = true;
+        }
+    }
+
+    // Join with <br> for vertical stacking
+    var dateCellHtml = uniqueEntries.map(function(e) { return e.date; }).join("<br>");
+    var timeCellHtml = uniqueEntries.map(function(e) { return e.time; }).join("<br>");
+
+    // 3. Prepare other data
+    var taskDataAttr = encodeURIComponent(JSON.stringify(order.tasks));
+    var totalTasks = order.tasks.length;
+    var allTeams = order.tasks.map(function(t) { return t.team; }).join(", ");
+    
+    var uniqueServices = order.tasks.map(function(t) { return t.service; }).filter(function(item, pos, self) {
+        return self.indexOf(item) == pos;
+    }).join(", ");
+
+    var uniqueId = "edit**" + order.id + "**" + order.tasks[0].dateId;    
+    
+    currentOrders += "<tr>" +
+      "<td>" + order.id + "</td>" +
+      "<td style='white-space:nowrap; vertical-align:middle; line-height:1.4;'>" + dateCellHtml + "</td>" + // Stacked Date
+      "<td style='white-space:nowrap; vertical-align:middle; line-height:1.4;'>" + timeCellHtml + "</td>" + // Stacked Time Range
+      "<td>" + order.phone + "</td>" +
+      "<td>" + order.name + "</td>" +
+      "<td>" + allTeams + "</td>" +
+      "<td>" + uniqueServices + "</td>" +
+      "<td></td>" +
+      "<td>Active (" + totalTasks + ")</td>" +
+      "<td><button class='button is-info is-small view-teams-btn' data-id='"+ order.id +"' data-name='"+ order.name +"' data-phone='"+ order.phone +"' data-tasks='" + taskDataAttr + "'>View Teams</button></td>" + 
+      "<td><button class='button is-warning is-small editCurrentOrder' id='" + uniqueId + "'><span class='icon is-small'><i class='far fa-edit'></i></span></button></td>" +
+      "</tr>";
+  }
+
+  // --- Completed Orders ---
+  var completedOrders = "";
+  for (var i in dataOrderCompleted) {
+    var formattedDate = Utilities.formatDate(new Date(dataOrderCompleted[i][col_Order_Date]), "GMT+3", "dd/MM/YYYY");
+    completedOrders += "<tr>" +
+      "<td>" + dataOrderCompleted[i][col_Order_OrderId] + "</td>" +
+      "<td>" + formattedDate + "</td>" +
+      "<td>" + safeTime(dataOrderCompleted[i][col_Order_Time]) + "</td>" +
+      "<td>" + dataOrderCompleted[i][col_Order_Phone] + "</td>" +
+      "<td>" + dataOrderCompleted[i][col_Order_Name] + "</td>" +
+      "<td>" + dataOrderCompleted[i][col_Order_Team] + "</td>" +
+      "<td>" + dataOrderCompleted[i][col_Order_Service] + "</td>" +
+      "<td>" + dataOrderCompleted[i][col_Order_Status] + "</td>" +
+      "<td>" + '<a class="button is-primary" id="button-coordinator-view-invoice" href="' + dataOrderCompleted[i][col_Order_Invoice] + '" target="_blank">View</a>' + "</td>" +
+      "<td><a class='button is-warning editCompletedOrder' id='edit**" + dataOrderCompleted[i][col_Order_OrderId] + "'><span class='icon is-small'><i class='far fa-edit'></i></span></a></td>" +
+      "</tr>";
+  }
+
+  // --- Waitlist Orders ---
+  var waitlistOrders = "";
+  for (var i in dataWaitlistWaiting) {
+    var formattedDate = Utilities.formatDate(new Date(dataWaitlistWaiting[i][col_Order_Date]), "GMT+3", "dd/MM/YYYY");
+    waitlistOrders += "<tr>" +
+      "<td>" + dataWaitlistWaiting[i][col_Order_OrderId] + "</td>" +
+      "<td>" + formattedDate + "</td>" +
+      "<td>" + safeTime(dataWaitlistWaiting[i][col_Order_Time]) + "</td>" +
+      "<td>" + dataWaitlistWaiting[i][col_Order_Phone] + "</td>" +
+      "<td>" + dataWaitlistWaiting[i][col_Order_Name] + "</td>" +
+      "<td>" + dataWaitlistWaiting[i][col_Order_Team] + "</td>" +
+      "<td>" + dataWaitlistWaiting[i][col_Order_Service] + "</td>" +
+      "<td>" + dataWaitlistWaiting[i][col_Order_Status] + "</td>" +
+      "<td><a class='button is-primary convertWaitlistButton' id='convert**" + dataWaitlistWaiting[i][col_Order_OrderId] + "'>Convert</a></td>" +
+      "<td><a class='button is-danger cancelWaitlistButton' id='cancel**" + dataWaitlistWaiting[i][col_Order_OrderId] + "'><span class='icon is-small'><i class='far fa-trash-alt'></i></span></a></td>" +
+      "</tr>";
+  }
+
+  // --- Pending Payment Orders ---
+  var pendingPaymentOrders = "";
+  for (var i in dataOrderPendingPayment) {
+    var formattedDate = Utilities.formatDate(new Date(dataOrderPendingPayment[i][col_Order_Date]), "GMT+3", "dd/MM/YYYY");
+    pendingPaymentOrders += "<tr>" +
+      "<td>" + dataOrderPendingPayment[i][col_Order_OrderId] + "</td>" +
+      "<td>" + formattedDate + "</td>" +
+      "<td>" + safeTime(dataOrderPendingPayment[i][col_Order_Time]) + "</td>" +
+      "<td>" + dataOrderPendingPayment[i][col_Order_Phone] + "</td>" +
+      "<td>" + dataOrderPendingPayment[i][col_Order_Name] + "</td>" +
+      "<td>" + dataOrderPendingPayment[i][col_Order_Team] + "</td>" +
+      "<td>" + dataOrderPendingPayment[i][col_Order_Service] + "</td>" +
+      "<td>" + (dataOrderPendingPayment[i][col_Order_LabourCharge] + dataOrderPendingPayment[i][col_Order_LocationCharge] + dataOrderPendingPayment[i][col_Order_SparePart] - dataOrderPendingPayment[i][col_Order_Discount]) + "</td>" +
+      "<td>" + dataOrderPendingPayment[i][col_Order_Status] + "</td>" +
+      "<td>" + '<a class="button is-primary" id="button-coordinator-view-invoice" href="' + dataOrderPendingPayment[i][col_Order_Invoice] + '" target="_blank" style="font-size: small;">View</a>' + "</td>" +
+      "<td><a class='button is-warning paidCashPendingPaymentOrder' id='paidCash**" + dataOrderPendingPayment[i][col_Order_OrderId] + "' style='font-size: small;'>Paid Cash</a></td>" +
+      "<td><a class='button is-warning paidPosPendingPaymentOrder' id='paidPos**" + dataOrderPendingPayment[i][col_Order_OrderId] + "' style='font-size: small;'>Paid POS</a></td>" +
+      "<td><a class='button is-warning paidTransferPendingPaymentOrder' id='paidTransfer**" + dataOrderPendingPayment[i][col_Order_OrderId] + "' style='font-size: small;'>Paid Transfer</a></td>" +
+      "<td><a class='button is-warning paidChequePendingPaymentOrder' id='paidCheque**" + dataOrderPendingPayment[i][col_Order_OrderId] + "' style='font-size: small;'>Paid Cheque</a></td>" +
+      "<td><a class='button is-warning paidLinkPendingPaymentOrder' id='paidLink**" + dataOrderPendingPayment[i][col_Order_OrderId] + "' style='font-size: small;'>Paid Link</a></td>" +
+      "</tr>";
+  }
+
+  return [arrayGeneralService, arrayCustomerPhone, arrayTeam, currentOrders, completedOrders, pendingPaymentOrders, arrayOrderId, htmlRejectionReason, waitlistOrders, htmlWhereKnow];
+}
+
+
+
+
+/* --- FETCH EXECUTION DATA FOR EDITING (FIXED) --- */
+function gasGetExecutionLog(orderId, teamName, dateStr) {
+  var ss = getSS();
+  // FIX: Check for both sheet name variations
+  var sheetExec = ss.getSheetByName("OrderExecution") || ss.getSheetByName("Order Execution");
+  
+  if (!sheetExec) return { found: false, error: "Execution sheet not found" };
+
+  var data = sheetExec.getDataRange().getValues();
+  
+  // Format date to match DB format (yyyy-MM-dd)
+  var targetDate = Utilities.formatDate(new Date(dateStr), "GMT+3", "yyyy-MM-dd");
+  var cleanId = String(orderId).trim();
+  
+  for (var i = 1; i < data.length; i++) {
+    var rowId = String(data[i][1]).trim(); // Order ID
+    var rowDate = Utilities.formatDate(new Date(data[i][2]), "GMT+3", "yyyy-MM-dd");
+    var rowTeam = String(data[i][3]).trim();
+    
+    if (rowId === cleanId && rowDate === targetDate && rowTeam === teamName) {
+       return {
+         found: true,
+         services: data[i][6], // The service string
+         startTime: data[i][4],
+         endTime: data[i][5],
+         row: i + 1
+       };
+    }
+  }
+  return { found: false };
+}
+
+/* --- SAVE EDITED EXECUTION DATA (FIXED) --- */
+function gasUpdateExecutionLog(orderId, teamName, dateStr, newServices, newStart, newEnd) {
+  var ss = getSS();
+  // FIX: Check for both sheet name variations
+  var sheetExec = ss.getSheetByName("OrderExecution") || ss.getSheetByName("Order Execution");
+  
+  if (!sheetExec) return "Error: Execution Sheet not found.";
+
+  var data = sheetExec.getDataRange().getValues();
+  
+  var targetDate = Utilities.formatDate(new Date(dateStr), "GMT+3", "yyyy-MM-dd");
+  var cleanId = String(orderId).trim();
+  
+  for (var i = 1; i < data.length; i++) {
+    var rowId = String(data[i][1]).trim();
+    var rowDate = Utilities.formatDate(new Date(data[i][2]), "GMT+3", "yyyy-MM-dd");
+    var rowTeam = String(data[i][3]).trim();
+    
+    if (rowId === cleanId && rowDate === targetDate && rowTeam === teamName) {
+       // Update Services, Start Time, End Time
+       sheetExec.getRange(i + 1, 7).setValue(newServices); 
+       sheetExec.getRange(i + 1, 5).setValue(newStart);
+       sheetExec.getRange(i + 1, 6).setValue(newEnd);
+       return "Services updated successfully!";
+    }
+  }
+  return "Error: Could not find original record to update.";
+}
+
+
+
+  //Get the list of auto complete items
+  function gasCheckCoordinatorPassword(enteredPassword) {
+
+    var ss = getSS();
+
+    var realPassword = ss.getSheetByName(sheetNameSetting).getRange("B1").getValue();
+
+    var passwordCorrect = false;
+
+    if (realPassword == enteredPassword) { passwordCorrect = true; }
+
+    return passwordCorrect;
+
+  }
+
+
+
+
+
+
+
+
+
+
+  function gasCheckPendingPaymentPassword(enteredPassword) {
+
+    var ss = getSS();
+
+    var realPassword = ss.getSheetByName(sheetNameSetting).getRange("B2").getValue();
+
+    var passwordCorrect = false;
+
+    if (realPassword == enteredPassword) { passwordCorrect = true; }
+
+    return passwordCorrect;
+
+  }
+
+
+
+
+
+
+
+
+
+  function gasCheckCompletedOrdersPassword(enteredPassword) {
+
+    var ss = getSS();
+
+    var realPassword = ss.getSheetByName(sheetNameSetting).getRange("B3").getValue();
+
+    var passwordCorrect = false;
+
+    if (realPassword == enteredPassword) { passwordCorrect = true; }
+
+    return passwordCorrect;
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+  //Get the list of auto complete items
+  function gasCheckTeamLeaderPassword(team, enteredPassword) {
+
+    var ss = getSS();
+
+    var sheetTeam = ss.getSheetByName(sheetNameTeam);
+    var dataTeam = sheetTeam.getDataRange().getValues();
+
+    //Remove header
+    dataTeam.shift();
+
+    for (var i in dataTeam) {
+
+      var currentTeam = dataTeam[i][0];
+
+      if (currentTeam == team) {
+
+        var realPassword = dataTeam[i][3];
+
+        break;
+
+      }
+
+    }
+
+    var passwordCorrect = false;
+
+    if (realPassword == enteredPassword) { passwordCorrect = true; }
+
+    return [passwordCorrect, team];
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  //Get the list of auto complete items
+  function gasGetCalendarEvents(team, service) {
+  var ss = getSS();
+  var sheetOrderScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+  var dataOrderScheduled = sheetOrderScheduled.getDataRange().getValues();
+  var sheetTeam = ss.getSheetByName(sheetNameTeam);
+  var dataTeam = sheetTeam.getDataRange().getValues();
+  dataTeam.shift();
+
+  var teamColour = {};
+  for (var m in dataTeam) { teamColour[dataTeam[m][0]] = dataTeam[m][2]; }
+  dataOrderScheduled.shift();
+
+  var eventArray = { events: [] };
+  var teams = team.split(',');
+  var services = service.split(',');
+
+  for (var i in dataOrderScheduled) {
+    var orderId = dataOrderScheduled[i][col_Order_OrderId];
+    var dateValue = dataOrderScheduled[i][col_Order_Date];
+    if (!orderId || !dateValue || orderId === "#N/A") continue;
+
+    var currentTeam = dataOrderScheduled[i][col_Order_Team];
+    var currentService = dataOrderScheduled[i][col_Order_Service];
+
+    // --- FIX: SAFE TIME PARSING ---
+    var rawTime = dataOrderScheduled[i][col_Order_Time];
+    if (!rawTime) continue;
+    var timeStr = (rawTime instanceof Date) ? Utilities.formatDate(rawTime, "GMT+3", "h:mm a") : String(rawTime);
+    
+    var timeParts = timeStr.split(" ");
+    if (timeParts.length < 2) continue;
+    var hm = timeParts[0].split(':');
+    var amPm = timeParts[1].toUpperCase();
+    var hour = parseInt(hm[0]);
+    var minute = hm[1];
+    // --- END FIX ---
+
+    if (amPm == 'PM' && hour < 12) hour += 12;
+    var endHour = (hour + 1).toString();
+    var hourStr = hour.toString().padStart(2, '0');
+    var endHourStr = endHour.padStart(2, '0');
+    var formattedDateCal = Utilities.formatDate(new Date(dateValue), "GMT+3", "yyyy-MM-dd");
+
+    eventArray['events'].push({
+      title: currentTeam + " - " + currentService,
+      start: formattedDateCal + 'T' + hourStr + ':' + minute + ':00',
+      end: formattedDateCal + 'T' + endHourStr + ':' + minute + ':00',
+      color: teamColour[currentTeam] || ""
+    });
+  }
+  return eventArray;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasGetSimpleCalendarEvents() {
+
+    var ss = getSS();
+
+    var sheetOrderScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+    var dataOrderScheduled = sheetOrderScheduled.getDataRange().getValues();
+
+    var sheetTeam = ss.getSheetByName(sheetNameTeam);
+    var dataTeam = sheetTeam.getDataRange().getValues();
+
+    //Remove header
+    dataTeam.shift();
+
+    //Create team colour objects
+    var teamColour = {};
+
+    for (var m in dataTeam) {
+
+      teamColour[dataTeam[m][0]] = dataTeam[m][2];
+
+    }
+
+    //Remove first row
+    dataOrderScheduled.shift();
+
+    var eventArray = {
+      morning: [],
+      afternoon: [],
+      evening: [],
+      night: []
+    };
+
+    var arrayDateListForFilter = [];
+    var checkUniqueDateList = {};
+
+    for (var i in dataOrderScheduled) {
+
+      var currentOrderNumber = dataOrderScheduled[i][col_Order_OrderId];
+      var currentTeam = dataOrderScheduled[i][col_Order_Team];
+      var currentService = dataOrderScheduled[i][col_Order_Service];
+      var currentNote = dataOrderScheduled[i][col_Order_Note];
+
+      var formattedDateCal = Utilities.formatDate(dataOrderScheduled[i][col_Order_Date], "GMT+3", "d MMM");
+      var originalTime = dataOrderScheduled[i][col_Order_Time];
+      var time = originalTime.slice(0, originalTime.length - 3).split(':');
+      var amPm = dataOrderScheduled[i][col_Order_Time].slice(-2);
+      var hour = parseInt(time[0]);
+      var minute = parseInt(time[1].substring(0, 1));
+
+      //Insert to date filter selection
+      if (checkUniqueDateList[formattedDateCal]) {
+        //Existed, skip
+      } else {
+        //Not existed yet, add to list
+        arrayDateListForFilter.push(formattedDateCal);
+        //Add to unique checker
+        checkUniqueDateList[formattedDateCal] = true;
+      }
+
+      //Get the team colour
+      var colour = "";
+
+      if (currentTeam.indexOf(",") == -1) { colour = teamColour[currentTeam]; }
+
+      var newEventObject =
+      {
+        orderNumber: currentOrderNumber,
+        dateTime: formattedDateCal + " " + originalTime,
+        teamService: currentTeam + " : " + currentService,
+        note: currentNote,
+        filterDate: formattedDateCal,
+        color: colour
+      };
+
+      //Categorized based on Morning, Afternoon, Evening
+      if (amPm == 'AM' && (hour < 11 || (hour == 11 && minute == 0))) {
+
+        eventArray['morning'].push(newEventObject);
+
+      } else if (hour == 11 && minute == 30) {
+
+        eventArray['afternoon'].push(newEventObject);
+
+      } else if (amPm == 'PM' && (hour < 3 || hour == 12)) {
+
+        eventArray['afternoon'].push(newEventObject);
+
+      } else if (amPm == 'PM' && (hour < 6 || (hour == 6 && minute == 0))) {
+
+        eventArray['evening'].push(newEventObject);
+
+      } else {
+
+        eventArray['night'].push(newEventObject);
+
+      }
+
+
+
+    }
+
+    Logger.log(eventArray);
+
+    //Prepare html for date list filter options
+    var htmlDateListForFilter = "<option value='Please Select'>Please select</option>";
+    for (var i in arrayDateListForFilter) { htmlDateListForFilter += "<option value='" + arrayDateListForFilter[i].replace(/ /g, '') + "'>" + arrayDateListForFilter[i] + "</option>" }
+
+    return [eventArray, htmlDateListForFilter];
+  }
+/* --- HELPER: ROUND TIME TO NEAREST 30 MINUTES --- */
+function roundToNearest30(dateObj) {
+  if (!dateObj || isNaN(dateObj.getTime())) return "";
+  
+  var coeff = 1000 * 60 * 30; // 30 minutes in milliseconds
+  var rounded = new Date(Math.round(dateObj.getTime() / coeff) * coeff);
+  
+  return Utilities.formatDate(rounded, "GMT+3", "h:mm a");
+}
+
+/* --- HELPER: SAFE TIME (ROBUST VERSION) --- */
+function safeTime(val) {
+  if (!val) return "";
+  
+  var dateObj = val;
+  
+  // 1. If it's a string, try to force it into a Date object
+  if (typeof val === 'string') {
+      var parsed = new Date(val);
+      if (!isNaN(parsed.getTime())) {
+          dateObj = parsed; // It was a date string (e.g. "Sat Dec 30 1899...")
+      }
+  }
+
+  // 2. If it is now a valid Date object, Round it
+  if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+      return roundToNearest30(dateObj); 
+  }
+  
+  // 3. Fallback: Return text
+  return String(val).trim();
+}
+ 
+ function gasGetOrdersForDate(targetDateString) {
+  var ss = getSS();
+  var sheetOrder = ss.getSheetByName(sheetNameOrderScheduled);
+  var data = sheetOrder.getDataRange().getValues();
+  data.shift(); // Remove headers
+
+  var ordersForDay = [];
+  // Handle Date Input Format (31 Jan 2026 vs 2026-01-31)
+  var targetDate = new Date(targetDateString);
+  var targetDateStr = Utilities.formatDate(targetDate, "GMT+3", "yyyy-MM-dd");
+
+  for (var i in data) {
+    var row = data[i];
+    var rowDate = row[col_Order_Date];
+    if (!rowDate) continue;
+    
+    var rowDateStr = (rowDate instanceof Date) ? 
+        Utilities.formatDate(rowDate, "GMT+3", "yyyy-MM-dd") : String(rowDate);
+
+    if (rowDateStr === targetDateStr) {
+      ordersForDay.push({
+        orderId: row[col_Order_OrderId],
+        // FIX: Use safeTime to round "8:02" to "8:00" and ensure String format
+        time: safeTime(row[col_Order_Time]), 
+        duration: safeTime(row[col_Order_Duration]),
+        customerPhone: row[col_Order_Phone],
+        customerName: row[col_Order_Name],
+        team: row[col_Order_Team],
+        service: row[col_Order_Service],
+        note: row[col_Order_Note],
+        status: row[col_Order_Status],
+        address: row[col_Order_AddressLabel]
+      });
+    }
+  }
+  
+  var sheetTeam = ss.getSheetByName(sheetNameTeam);
+  var teamData = sheetTeam.getDataRange().getValues();
+  teamData.shift();
+
+  var teamList = (teamData.length > 0) ? teamData.map(function(r){ return r[0]; }) : []; 
+
+  return {
+    orders: ordersForDay || [],
+    teams: teamList
+  };
+}
+
+
+
+
+
+
+
+
+
+
+  function checkConflictingBooking(allFormData) {
+
+    var ss = getSS();
+
+    var team = allFormData[6];
+    var date = allFormData[0];
+    var originalTime = allFormData[1];
+
+    // var team = "Team 6"
+    // var date = "03/27/2022"
+    // var originalTime = "'11:30 AM"
+
+    var teams = team.split(",");
+
+    var removedQuoteTime = originalTime.substring(1);
+    var convertedTime = convertTimeToMins(removedQuoteTime);
+
+    var sheetOrderScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+    var dataOrderScheduled = sheetOrderScheduled.getDataRange().getDisplayValues();
+
+    //Remove first row
+    dataOrderScheduled.shift();
+
+    for (var i in dataOrderScheduled) {
+
+      var currentOrderNumber = dataOrderScheduled[i][col_Order_OrderId];
+      var currentTeam = dataOrderScheduled[i][col_Order_Team];
+      var currentDate = dataOrderScheduled[i][col_Order_Date];
+
+      //Skip if the team not involved or different date
+      var teamInvolved = false;
+
+      for (var j in teams) {
+
+        if (currentTeam.indexOf(teams[j]) != -1) {
+
+          teamInvolved = true;
+
+          break;
+
+        }
+
+      }
+
+      //Skip if the team not involved or different date
+      if (teamInvolved == false || currentDate != date) {
+
+        continue;
+
+      } else {
+
+        //Now, team is the same and date also the same, need further check on the timing
+        var currentTime = dataOrderScheduled[i][col_Order_Time];
+        var convertedCurrentTime = convertTimeToMins(currentTime);
+
+        if (Math.abs(convertedCurrentTime - convertedTime) <= 30) {
+
+          //Throw clashing error
+          return "This order will clash with Order " + currentOrderNumber + " on " + currentDate + " at " + currentTime + " for " + currentTeam;
+
+        }
+
+      }
+
+
+
+    }
+
+
+    //No clashing found
+    return "OK";
+
+  }
+
+
+
+
+
+
+
+
+
+
+  function testgasGetTableTeamCurrentOrder() {
+
+    gasGetTableTeamCurrentOrder("Team 1");
+
+  }
+
+
+
+
+
+  function gasGetTableTeamCurrentOrder(teamName) {
+    var ss = getSS();
+    var sheetOrderScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+    var dataOrderScheduled = sheetOrderScheduled.getDataRange().getValues();
+    dataOrderScheduled.shift(); // Remove header
+
+    // --- 1. ANALYSIS: Count Active Tasks per Order ---
+    var orderRemainingTasks = {};
+    var orderMaxMoment = {};      
+    var orderHasStarted = {};     
+
+    for (var i in dataOrderScheduled) {
+      var row = dataOrderScheduled[i];
+      var id = String(row[col_Order_OrderId]).trim(); 
+      var rowStatus = String(row[col_Order_Status]).trim();
+      var rawDate = row[col_Order_Date];
+      var endTimeStr = row[col_Order_Duration];
+
+      if (!id) continue;
+
+      // Count Active Tasks
+      if (rowStatus !== "Day Completed" && rowStatus !== "Completed") {
+          if (!orderRemainingTasks[id]) orderRemainingTasks[id] = 0;
+          orderRemainingTasks[id]++;
+      }
+
+      // Check if Order Started
+      if (rowStatus === "Day Completed") {
+          orderHasStarted[id] = true;
+      }
+
+      // Calculate Max Moment
+      if (rawDate) {
+          var dateTimestamp = new Date(rawDate).getTime();
+          var endTimeMinutes = convertAmPmForSorting(endTimeStr || "0:00 AM");
+          var currentMoment = dateTimestamp + (endTimeMinutes * 60 * 1000);
+          if (!orderMaxMoment[id] || currentMoment > orderMaxMoment[id]) {
+              orderMaxMoment[id] = currentMoment;
+          }
+      }
+    }
+
+    var currentOrders = "";
+    var objectOrdersByDate = {}; 
+    var arrayOrderOfDate = [];
+
+    // --- 2. BUILD VIEW ---
+    for (var i in dataOrderScheduled) {
+      var row = dataOrderScheduled[i];
+      var currentStatus = String(row[col_Order_Status]).trim();
+      var currentTeam = String(row[col_Order_Team]).trim();
+      
+      // Strict Team Match
+      var teamInvolved = (currentTeam == teamName || currentTeam.indexOf(teamName) > -1);
+
+      // FILTER: Show only active tasks (Not Completed)
+      if (currentStatus !== "Day Completed" && currentStatus !== "Completed" && teamInvolved) {
+        
+        var orderId = String(row[col_Order_OrderId]).trim();
+        var formattedDate = Utilities.formatDate(row[col_Order_Date], "GMT+3", "d MMM YYYY");
+        var formattedDateTable = Utilities.formatDate(row[col_Order_Date], "GMT+3", "dd/MM/YYYY");
+        
+        // --- FIX: ALWAYS FORCE "COMPLETE DAY" FLOW ---
+        // Even if it is the last task, we force them to "Complete Day" first to save their data.
+        // The Frontend will automatically trigger the Invoice after submission.
+        var showInvoiceButton = false; 
+
+        // Status Label
+        var displayStatus = currentStatus;
+        if (orderHasStarted[orderId] === true) {
+            displayStatus = "Order still in progress";
+        }
+
+        // --- A. CARD DATA (Mobile) ---
+        var orderItem = [
+            convertAmPmForSorting(row[col_Order_Time]), 
+            safeTime(row[col_Order_Time]), 
+            orderId,                   
+            row[col_Order_Phone],  
+            row[col_Order_Name],       
+            row[col_Order_Team],       
+            row[col_Order_Service],    
+            row[col_Order_Note],       
+            row[col_Order_AddressLink],
+            row[col_Order_Phone2],     
+            showInvoiceButton,         
+            formattedDate,            
+            safeTime(row[col_Order_Duration]) 
+        ];
+
+        if (!objectOrdersByDate[formattedDate]) {
+          objectOrdersByDate[formattedDate] = [];
+          arrayOrderOfDate.push(formattedDate);
+        }
+        objectOrdersByDate[formattedDate].push(orderItem);
+
+        // --- B. TABLE ROW (Desktop) ---
+        currentOrders += "<tr>" +
+          "<td>" + orderId + "</td>" +
+          "<td>" + formattedDateTable + "</td>" +
+          "<td>" + safeTime(row[col_Order_Time]) + "</td>" + 
+          "<td>" + row[col_Order_Phone] + "</td>" +
+          "<td>" + row[col_Order_Name] + "</td>" +
+          "<td>" + row[col_Order_Team] + "</td>" +
+          "<td>" + row[col_Order_Service] + "</td>" +
+          "<td>" + row[col_Order_Note] + "</td>" +
+          "<td>" + displayStatus + "</td>" + 
+          "<td><a href='" + row[col_Order_AddressLink] + "' target='_blank'>" + row[col_Order_AddressLabel] + "</a></td>";
+
+        if (orderId.toString().indexOf("BO") != -1) {
+          currentOrders += "<td><a class='button is-primary completedBackOrder' id='" + orderId + "**" + row[col_Order_Name] + "**" + row[col_Order_Phone] + "'>Complete</a></td></tr>";
+        } else {
+          // FIX: Always render "Complete Day" button
+          var btnId = "day**" + orderId + "**" + formattedDate + "**" + row[col_Order_Team] + "**" + safeTime(row[col_Order_Time]) + "**" + safeTime(row[col_Order_Duration]);
+          currentOrders += "<td><a class='button is-warning completeDayWork' id='" + btnId + "'>Complete Day</a></td></tr>";
+        }
+      }
+    }
+
+    // --- 3. GENERATE HTML CARDS ---
+    var htmlCard = "";
+    for (var i in arrayOrderOfDate) {
+      var dateKey = arrayOrderOfDate[i];
+      htmlCard += '<div class="card card-team"><header class="card-header" style="background-color: #f7901e; border-radius: 6px"><p class="card-header-title">' + dateKey + '</p></header></div>';
+
+      var sorted = sort2dArray(objectOrdersByDate[dateKey]);
+      for (var j in sorted) {
+        var o = sorted[j];
+        htmlCard += '<div class="card card-team"><header class="card-header" style="background-color: #414042;border-radius: 6px 6px 0px 0px;"><p class="card-header-title">' + o[1] + '</p></header><div class="card-content"><div class="content"><table class="table is-fullwidth is-responsive"><tr><td><b>Order Number</b></td><td>' + o[2] + '</td></tr><tr><td><b>Phone Number</b></td><td>' + o[3] + '</td></tr><tr><td><b>Phone Number 2</b></td><td>' + o[9] + '</td></tr><tr><td><b>Name</b></td><td>' + o[4] + '</td></tr><tr><td><b>Team</b></td><td>' + o[5] + '</td></tr><tr><td><b>Service Type</b></td><td>' + o[6] + '</td></tr><tr><td><b>Notes</b></td><td>' + o[7] + '</td></tr></table></div></div><footer class="card-footer"><a href="' + o[8] + '" class="card-footer-item" target="_blank">Google Maps</a>';
+        
+        if (o[2].toString().indexOf("BO") != -1) {
+          htmlCard += '<a class="card-footer-item completedBackOrder" id="' + o[2] + '**' + o[4] + '**' + o[3] + '">Complete</a></footer></div>';
+        } else {
+             // FIX: Always render "Complete Day Work" button
+             var btnId = "day**" + o[2] + "**" + dateKey + "**" + o[5] + "**" + o[1] + "**" + o[12];
+             htmlCard += '<a class="card-footer-item completeDayWork" id="' + btnId + '">Complete Day Work</a></footer></div>';
+        }
+      }
+    }
+    
+    return [currentOrders, htmlCard];
+}
+
+
+
+
+ function convertAmPmForSorting(time) {
+  if (!time || time === "") return 0;
+  
+  // Landmark: Force Date objects into readable strings to avoid 1899 errors
+  var timeStr = (time instanceof Date) ? 
+      Utilities.formatDate(time, "GMT+3", "h:mm a") : String(time);
+  
+  var parts = timeStr.split(" ");
+  if (parts.length < 2) return 0;
+  
+  var amPm = parts[1].toUpperCase();
+  var arraySplitHourMin = parts[0].split(":");
+  var hour = parseInt(arraySplitHourMin[0]);
+  var min = parseInt(arraySplitHourMin[1]);
+  
+  if (amPm === "AM" && hour === 12) hour = 0;
+  if (amPm === "PM" && hour !== 12) hour += 12;
+  
+  return (hour * 60) + min;
+}
+
+
+/* --- HELPER: CONVERT TIME STRING TO MINUTES --- */
+function convertTimeToMins(timeStr) {
+  if (!timeStr) return 0;
+  
+  // Clean the string (remove quotes if present)
+  var time = String(timeStr).replace(/'/g, "").trim();
+  
+  // Parse "9:30 AM"
+  var parts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  
+  if (!parts) {
+      // Fallback if formatting is weird
+      return 0; 
+  }
+
+  var hours = parseInt(parts[1], 10);
+  var minutes = parseInt(parts[2], 10);
+  var ampm = parts[3].toUpperCase();
+
+  if (ampm == "PM" && hours < 12) hours += 12;
+  if (ampm == "AM" && hours == 12) hours = 0;
+
+  return (hours * 60) + minutes;
+}
+
+
+
+
+
+
+  function sort2dArray(arrayOfCurrentDateOrder) {
+
+    var arr = arrayOfCurrentDateOrder.sort(function (a, b) {
+      return a[0] - b[0];
+    });
+
+    return arr;
+
+  }
+
+
+
+
+
+
+
+
+
+  function gasGetCustomerNameAndAddress(customerPhoneNumber) {
+
+    var ss = getSS();
+
+    var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+    var dataCustomer = sheetCustomer.getDataRange().getValues();
+
+    var sheetAddressCustomer = ss.getSheetByName(sheetNameAddress);
+    var dataAddress = sheetAddressCustomer.getDataRange().getValues();
+
+    //Get the corresponding customer name based on customer phone
+    for (var j in dataCustomer) {
+
+      if (dataCustomer[j][0] == customerPhoneNumber) {
+
+        var customerName = dataCustomer[j][1];
+
+        break;
+
+      }
+
+    }
+
+
+    //Get the corresponding customer address label based on customer phone
+    var htmlAddressLabel = "<option value='Please Select'>Please select</option>";
+
+    for (var j in dataAddress) {
+
+      if (dataAddress[j][0] == customerPhoneNumber) {
+
+        htmlAddressLabel += "<option value='" + customerPhoneNumber + "***" + dataAddress[j][1] + "'>" + dataAddress[j][1] + "</option>";
+
+      }
+
+    }
+
+    htmlAddressLabel += "<option value='newaddress'>Add new address</option>";
+
+    return [customerName, htmlAddressLabel];
+
+  }
+
+
+
+
+
+
+
+
+
+
+  function gasGetAddressLink(phoneNumber, addressLabel, type) {
+
+    var ss = getSS();
+
+    var sheetAddressCustomer = ss.getSheetByName(sheetNameAddress);
+    var dataAddress = sheetAddressCustomer.getDataRange().getValues();
+
+    //Get the corresponding address link based on customer phone and address label
+    for (var i in dataAddress) {
+
+      if (dataAddress[i][0] == phoneNumber && dataAddress[i][1] == addressLabel) {
+
+        var addressLink = dataAddress[i][2];
+
+        break;
+
+      }
+
+    }
+
+    return [addressLink, type];
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasGetPastBookingDetails(pastOrderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrderId = sheetOrder.getRange("A1:A").getDisplayValues();
+
+    for (var j in dataOrderId) {
+
+      if (dataOrderId[j][0] == pastOrderId) {
+
+        var row = parseInt(j) + 1;
+
+        var dataSelectedOrder = sheetOrder.getRange(row, 1, 1, 20).getDisplayValues();
+
+        var objectResult = {
+          'id': dataSelectedOrder[0][0],
+          'date': dataSelectedOrder[0][1],
+          'time': dataSelectedOrder[0][2],
+          'duration': dataSelectedOrder[0][3],
+          'phone': dataSelectedOrder[0][4],
+          'name': dataSelectedOrder[0][5],
+          'team': dataSelectedOrder[0][6].split(','),
+          'service': dataSelectedOrder[0][7].split(','),
+          'note': dataSelectedOrder[0][8],
+          'addressLabel': dataSelectedOrder[0][18],
+          'addressLink': dataSelectedOrder[0][19]
+        };
+
+        break;
+
+      }
+
+    }
+
+    return objectResult;
+
+  }
+
+
+
+
+
+
+
+
+
+  function gasAddOrder(allFormData, existingOrderId) {
+    
+    var selectedOrderType = allFormData[8];
+
+    if (selectedOrderType == 'Normal Order') {
+      return gasAddNormalOrder(allFormData);
+    } else if (selectedOrderType == 'Back Order') {
+      return gasAddBackOrder(allFormData, existingOrderId);
+    } else if (selectedOrderType == 'Wait List') {
+      gasAddWaitlistOrder(allFormData);
+      return "Waitlist order submitted successfully!";
+    } else if (selectedOrderType == 'Multi-day Order') {
+      // NEW: Handle Multi-day
+      return gasAddMultiDayOrder(allFormData);
+    }
+  }
+
+  function gasAddMultiDayOrder(allFormData) {
+    var ss = getSS();
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);            // Master Sheet
+    var sheetScheduled = ss.getSheetByName(sheetNameOrderScheduled); // Schedule Sheet
+
+    // 1. Parse Data
+    var dates = JSON.parse(allFormData[0]); 
+    var times = JSON.parse(allFormData[1]);
+    var durations = JSON.parse(allFormData[2]);
+    var services = JSON.parse(allFormData[3]);
+    var teams = JSON.parse(allFormData[6]); // This is an array: ["Team 1", "Team 2"]
+    // Check if rows conflict with EACH OTHER (e.g. Team 1 booked twice at same time in this form)
+    for (var i = 0; i < dates.length; i++) {
+      for (var j = i + 1; j < dates.length; j++) {
+        // If same Date AND same Team
+        if (dates[i] == dates[j] && teams[i] == teams[j]) {
+            // Check if Start Times match (Simple check)
+            if (times[i] == times[j]) {
+                return "Error: You assigned " + teams[i] + " twice at " + times[i] + " on " + dates[i] + ". Please check your rows.";
+            }
+        }
+      }
+    }
+    // Standard Variables
+    var rawCustomerPhone = allFormData[4]; 
+    var customerName = allFormData[5];
+    var note = allFormData[7];
+    var whereKnow = allFormData[9];
+    var selectedAddress = allFormData[10];
+    var addressLabel = allFormData[11];
+    var addressLink = allFormData[12];
+    var ignoreConflict = allFormData[13]; 
+    var customerPhone2 = allFormData[14];
+
+    // 2. Conflict Check (Loop)
+    if (!ignoreConflict) {
+      for (var i = 0; i < dates.length; i++) {
+        var mockFormData = [];
+        mockFormData[0] = dates[i];
+        mockFormData[1] = times[i];
+        mockFormData[6] = teams[i]; // Check conflict for SPECIFIC team on SPECIFIC date
+        var conflict = checkConflictingBooking(mockFormData);
+        if (conflict != "OK") return "Conflict on " + dates[i] + ": " + conflict;
+      }
+    }
+
+    // 3. Generate MD Order ID
+    var newOrderId = getOrderId("MD"); // <--- USES NEW 'MD' PREFIX
+    var status = "Scheduled";
+
+    // 4. SAVE TO MASTER 'ORDER' SHEET
+    // We join ALL teams/services for the master record: "Team 1, Team 2"
+    var allTeamsString = Array.isArray(teams) ? teams.join(',') : teams;
+    var allServicesString = Array.isArray(services) ? services.join(',') : services;
+
+    var masterRow = [newOrderId, dates[0], times[0], durations[0], rawCustomerPhone, customerName, allTeamsString, allServicesString, note, status, "", "", "", "", "", "", "", "", addressLabel, addressLink, customerPhone2];
+    sheetOrder.appendRow(masterRow);
+
+    // 5. SAVE TO 'ORDERSCHEDULED' SHEET (The Fix)
+    // We loop and save ONE team per row.
+    for (var i = 0; i < dates.length; i++) {
+      // CRITICAL: We use teams[i] here, NOT the joined string. 
+      // This ensures Day 1 is assigned ONLY to Team 1.
+      var specificTeam = teams[i]; 
+      var specificService = services[i];
+
+      var scheduledRow = [newOrderId, dates[i], times[i], durations[i], rawCustomerPhone, customerName, specificTeam, specificService, note, status, "", "", "", "", "", "", "", "", addressLabel, addressLink, customerPhone2];
+      sheetScheduled.appendRow(scheduledRow);
+    }
+
+    // 6. Update Customer Database
+    var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+    var dataCustomer = sheetCustomer.getDataRange().getValues();
+    dataCustomer.shift(); 
+    var arrayCustomerPhone = flatten(sliceArray(dataCustomer, 0, 1));
+    var indexCustomerPhone = arrayCustomerPhone.indexOf(parseInt(rawCustomerPhone));
+
+    if (indexCustomerPhone < 0) {
+      sheetCustomer.appendRow([rawCustomerPhone, customerName]);
+    } else {
+      sheetCustomer.getRange(indexCustomerPhone + 2, 2).setValue(customerName);
+    }
+
+    // 7. Update Marketing & Address
+    if (whereKnow) { 
+      var sheetMarketing = ss.getSheetByName(sheetNameMarketingChannel);
+      sheetMarketing.appendRow(["Multi-day Order", new Date(), newOrderId, whereKnow]);
+    }
+    if (selectedAddress == 'newaddress') {
+      var sheetAddr = ss.getSheetByName(sheetNameAddress);
+      sheetAddr.appendRow([rawCustomerPhone, addressLabel, addressLink]);
+    }
+    
+    return "Multi-day order created! ID: " + newOrderId;
+  }
+
+
+
+
+
+
+  function setProperty() {
+
+    PropertiesService.getScriptProperties().setProperty("MONTH", 9);
+
+    PropertiesService.getScriptProperties().setProperty("MONTHLY_RUNNING_NUMBER", 99);
+
+    // var properties = PropertiesService.getScriptProperties().getKeys();
+
+    // for (var i in properties) {
+
+    //   Logger.log(properties[i]);
+
+    // }
+
+  }
+
+
+
+
+  function padNumber(number, n) {
+    return (new Array(n).join('0') + number).slice(-n);
+  }
+
+
+
+
+
+
+
+  function getOrderId(type) {
+    var prefix = "";
+    var propertyKey = "";
+
+    if (type === "MD") {
+      prefix = "RSH/MD/";
+      propertyKey = "MD_RUNNING_NUMBER"; // Separate counter for MD
+    } else {
+      prefix = "RSH/N/";
+      propertyKey = "MONTHLY_RUNNING_NUMBER"; // Existing counter for Normal
+    }
+
+    var today = new Date();
+    var month = today.getMonth() + 1;
+    var year = today.getFullYear();
+
+    // Check stored month to reset counters if needed
+    var storedMonth = parseInt(PropertiesService.getScriptProperties().getProperty("MONTH"));
+    var runningNumber = parseInt(PropertiesService.getScriptProperties().getProperty(propertyKey)) || 0;
+
+    if (storedMonth != month) {
+      // New month? Reset ALL counters
+      PropertiesService.getScriptProperties().setProperty("MONTH", month);
+      PropertiesService.getScriptProperties().setProperty("MONTHLY_RUNNING_NUMBER", 0);
+      PropertiesService.getScriptProperties().setProperty("MD_RUNNING_NUMBER", 0);
+      runningNumber = 1; 
+    } else {
+      runningNumber = runningNumber + 1;
+    }
+
+    // Save the new count
+    PropertiesService.getScriptProperties().setProperty(propertyKey, runningNumber);
+
+    // Format: RSH/MD/2026/01/0001
+    var paddedMonth = ("0" + month).slice(-2);
+    var paddedNumber = ("0000" + runningNumber).slice(-4);
+
+    return prefix + year + "/" + paddedMonth + "/" + paddedNumber;
+  }
+
+
+
+
+
+
+
+
+  function getBackOrderId(ss, existingOrderId) {
+
+    var sheetBackOrderNumber = ss.getSheetByName(sheetNameBackOrderNumber);
+    var dataBackOrderNumber = sheetBackOrderNumber.getDataRange().getValues();
+
+    var recordFound = false;
+
+    for (var i in dataBackOrderNumber) {
+
+      if (existingOrderId == dataBackOrderNumber[i][0]) {
+
+        var currentBackOrderNumber = dataBackOrderNumber[i][1];
+
+        var newBackOrderNumber = currentBackOrderNumber + 1;
+
+        //Update the number
+        var row = parseInt(i) + 1;
+        sheetBackOrderNumber.getRange(row, 2).setValue(newBackOrderNumber);
+
+        recordFound = true;
+
+        break;
+
+      }
+
+    }
+
+    if (recordFound == false) {
+
+      var newBackOrderNumber = 1;
+
+      sheetBackOrderNumber.appendRow([existingOrderId, 1]);
+
+    }
+
+    var finalBackOrderNumber = existingOrderId + "-BO-" + newBackOrderNumber;
+
+    return finalBackOrderNumber;
+
+  }
+
+
+
+
+
+
+
+
+
+  function getInvoiceId(ss) {
+
+    var invoiceNumberPrefix = 'RSH/INV/';
+
+    var sheetTracker = ss.getSheetByName("Tracker");
+    var storedMonth = sheetTracker.getRange("B1").getValue();
+    var storedMonthlyRunningNumber = sheetTracker.getRange("B2").getValue();
+
+    var today = new Date();
+    var month = today.getMonth() + 1;
+    var year = today.getFullYear();
+
+    if (storedMonth != month) {
+
+      //New month, start new running number
+      var runningNumber = 1;
+
+      sheetTracker.getRange("B1").setValue(month);
+
+    } else {
+
+      //Still same month, continue running number
+      var runningNumber = storedMonthlyRunningNumber + 1;
+
+    }
+
+    //Update running number
+    sheetTracker.getRange("B2").setValue(runningNumber);
+
+    //Add padding
+    var paddedMonth = padNumber(month, 2);
+    var paddedNumber = padNumber(runningNumber, 4);
+
+    var finalInvoiceNumber = invoiceNumberPrefix + year + "/" + paddedMonth + "/" + paddedNumber;
+
+    return finalInvoiceNumber;
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+  function gasAddNormalOrder(allFormData) {
+    Logger.log(allFormData);
+    var ss = getSS();
+
+    // Check for conflict
+    var ignoreConflict = allFormData[13];
+    if (ignoreConflict == false) {
+      var conflict = checkConflictingBooking(allFormData);
+      if (conflict != "OK") return conflict;
+    }
+
+    // 1. Generate ID (N prefix)
+    var newOrderId = getOrderId("N"); 
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var sheetScheduled = ss.getSheetByName(sheetNameOrderScheduled); 
+    var lastRowSheetOrder = sheetOrder.getLastRow();
+    var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+    var status = "Scheduled";
+
+    // 2. Prepare Lists
+    // The frontend sends "Team 1, Team 2" and "Service A, Service B" as strings
+    var teamsString = allFormData[6];
+    var servicesString = allFormData[3];
+    
+    var teamList = teamsString.split(',').map(function(item) { return item.trim(); });
+    var serviceList = servicesString.split(',').map(function(item) { return item.trim(); });
+
+    // 3. Save to Master 'ORDER' Sheet (Combined Row)
+    // We keep the combined string here for the Coordinator's view
+    var updateArray = [newOrderId, allFormData[0], allFormData[1], allFormData[2], allFormData[4], allFormData[5], teamsString, servicesString, allFormData[7], status];
+    sheetOrder.appendRow(updateArray);
+
+    // 4. Save to 'ORDERSCHEDULED' Sheet (SPLIT ROWS)
+    // This is the key change: One row per team
+    for (var k = 0; k < teamList.length; k++) {
+        var thisTeam = teamList[k];
+        // If there are fewer services than teams, just reuse the last service, or empty
+        var thisService = serviceList[k] || serviceList[0]; 
+
+        var scheduledRow = [
+            newOrderId,       // ID
+            allFormData[0],   // Date
+            allFormData[1],   // Time
+            allFormData[2],   // Duration
+            allFormData[4],   // Phone
+            allFormData[5],   // Name
+            thisTeam,         // <--- SPECIFIC TEAM
+            thisService,      // <--- SPECIFIC SERVICE
+            allFormData[7],   // Note
+            status,           // Status
+            "", "", "", "", "", "", "", "", 
+            allFormData[11],  // Address Label
+            allFormData[12],  // Address Link
+            allFormData[14]   // Phone 2
+        ];
+        sheetScheduled.appendRow(scheduledRow);
+    }
+
+    // 5. Handle Customer & Address (Standard logic)
+    var dataCustomer = sheetCustomer.getDataRange().getValues();
+    dataCustomer.shift();
+    var arrayCustomerPhone = flatten(sliceArray(dataCustomer, 0, 1));
+    var indexCustomerPhone = arrayCustomerPhone.indexOf(parseInt(allFormData[4]));
+
+    if (indexCustomerPhone < 0) {
+      sheetCustomer.appendRow([allFormData[4], allFormData[5]]);
+    } else {
+      sheetCustomer.getRange(indexCustomerPhone + 2, 2).setValue(allFormData[5]);
+    }
+
+    if (allFormData[9]) { 
+      var sheetMarketingChannel = ss.getSheetByName(sheetNameMarketingChannel);
+      sheetMarketingChannel.appendRow(["Normal Order", new Date(), newOrderId, allFormData[9]]);
+    }
+
+    var selectedAddress = allFormData[10];
+    sheetOrder.getRange(lastRowSheetOrder + 1, 19, 1, 3).setValues([[allFormData[11], allFormData[12], allFormData[14]]]);
+
+    if (selectedAddress == 'newaddress') {
+      var sheetAddressCustomer = ss.getSheetByName(sheetNameAddress);
+      sheetAddressCustomer.appendRow([allFormData[4], allFormData[11], allFormData[12]]);
+    }
+
+    return "Normal-Day Order Created Successfully: " + newOrderId;
+  }
+
+
+
+
+
+
+
+
+
+  function gasAddBackOrder(allFormData, existingOrderId) {
+
+    var ss = getSS();
+
+    //Check for conflict first if Ignore Conflict is false
+    var ignoreConflict = allFormData[13];
+
+    if (ignoreConflict == false) {
+
+      var conflict = checkConflictingBooking(allFormData);
+      if (conflict != "OK") {
+        return conflict;
+      }
+
+    }
+
+    var newOrderId = getBackOrderId(ss, existingOrderId);
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var lastRowSheetOrder = sheetOrder.getLastRow();
+
+    var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+    var dataCustomer = sheetCustomer.getDataRange().getValues();
+
+    dataCustomer.shift();
+    var arrayCustomerPhone = flatten(sliceArray(dataCustomer, 0, 1));
+
+    Logger.log(arrayCustomerPhone);
+
+    var status = "Scheduled";
+
+    var updateArray = [newOrderId, allFormData[0], allFormData[1], allFormData[2], allFormData[4], allFormData[5], allFormData[6], allFormData[3], allFormData[7], status];
+
+    sheetOrder.appendRow(updateArray);
+
+
+    var indexCustomerPhone = arrayCustomerPhone.indexOf(parseInt(allFormData[4]));
+
+    //If the customer phone number is not found, add to the Customer sheet
+    if (indexCustomerPhone < 0) {
+
+      sheetCustomer.appendRow([allFormData[4], allFormData[5]]);
+
+    } else {
+
+      //If the number exist, replace the customer name with new name obtain from the form
+      sheetCustomer.getRange(indexCustomerPhone + 2, 2).setValue(allFormData[5]);
+
+    }
+
+    //Process the address
+    var addressLabel = allFormData[11];
+    var addressLink = allFormData[12];
+
+    //Update the address and customer phone 2 in Order Sheet
+    var customerPhone2 = allFormData[14];
+    sheetOrder.getRange(lastRowSheetOrder + 1, 19, 1, 3).setValues([[addressLabel, addressLink, customerPhone2]]);
+
+
+    //Send Whatsapp meesage - Back Order Scheduled
+    var templateType = 'backorder_scheduled';
+    var templateName = '';
+    var broadcastName = '';
+    var phoneNumber = allFormData[5];
+    var arrayParameters = [];
+    //var arrayParameters = [backordernumber,dayarabic,datearabic,time,callcenternumber,dayenglish,dateenglish]; //This is the guide
+
+    //sendWhatsappTemplateMessage(templateType, templateName, broadcastName, phoneNumber, arrayParameters);
+
+    return "Back order submitted successfully!";
+
+
+  }
+
+
+
+
+
+
+
+
+
+  function gasAddWaitlistOrder(allFormData) {
+
+    Logger.log(allFormData);
+
+    var storedWaitListID = parseInt(PropertiesService.getScriptProperties().getProperty("WAITLIST_ID"));
+
+    var newWaitlistId = storedWaitListID + 1;
+
+    PropertiesService.getScriptProperties().setProperty("WAITLIST_ID", newWaitlistId);
+
+
+    var ss = getSS();
+
+    var sheetWaitlist = ss.getSheetByName(sheetNameWaitlist);
+
+    var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+    var dataCustomer = sheetCustomer.getDataRange().getValues();
+
+    dataCustomer.shift();
+    var arrayCustomerPhone = flatten(sliceArray(dataCustomer, 0, 1));
+
+    Logger.log(arrayCustomerPhone);
+
+    var status = "Waiting";
+
+    //Process the address
+    var selectedAddress = allFormData[10];
+    var addressLabel = allFormData[11];
+    var addressLink = allFormData[12];
+
+    var updateArray = [newWaitlistId, allFormData[0], allFormData[1], allFormData[2], allFormData[4], allFormData[5], allFormData[6], allFormData[3], allFormData[7], status, addressLabel, addressLink, allFormData[14]];
+
+    sheetWaitlist.appendRow(updateArray);
+
+    var indexCustomerPhone = arrayCustomerPhone.indexOf(parseInt(allFormData[4]));
+
+    //If the customer phone number is not found, add to the Customer sheet
+    if (indexCustomerPhone < 0) {
+
+      sheetCustomer.appendRow([allFormData[4], allFormData[5]]);
+
+    } else {
+
+      //If the number exist, replace the customer name with new name obtain from the form
+      sheetCustomer.getRange(indexCustomerPhone + 2, 2).setValue(allFormData[5]);
+
+    }
+
+    //Update the Marketing Channel tab
+    var sheetMarketingChannel = ss.getSheetByName(sheetNameMarketingChannel);
+    sheetMarketingChannel.appendRow(["Wait List", new Date(), newWaitlistId, allFormData[9]]);
+
+    //Add to Address tab if new
+    if (selectedAddress == 'newaddress') {
+
+      //Append to Address sheet
+      var sheetAddressCustomer = ss.getSheetByName(sheetNameAddress);
+      sheetAddressCustomer.appendRow([allFormData[4], addressLabel, addressLink]);
+
+    }
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+  function gasAddRejectedOrder(allFormData) {
+
+    var ss = getSS();
+
+    var sheetRejectedOrder = ss.getSheetByName(sheetNameRejectedOrder);
+    var sheetMarketingChannel = ss.getSheetByName(sheetNameMarketingChannel);
+
+    sheetRejectedOrder.appendRow([new Date(), allFormData[0], allFormData[1], allFormData[2]]);
+    sheetMarketingChannel.appendRow(["Rejected Order", new Date(), "", allFormData[3]]);
+
+    return "Rejected order was submitted.";
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+function gasGetOrderDetailWithOrderId(orderId, type, specificDate) {
+  Logger.log("🚀 SEARCHING - ID: " + orderId);
+  
+  if (!orderId) return null;
+  var targetId = String(orderId).trim().toUpperCase();
+  var ss = getSS();
+  
+  var sheetName = (type === "current") ? sheetNameOrderScheduled : sheetNameWaitlistWaiting;
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return null;
+  var data = sheet.getDataRange().getValues();
+
+  var tasks = [];
+  var masterRow = null;
+
+  // --- HELPER: Fix 1899 Dates & Round to Nearest 30 Mins ---
+  var safeTime = function(val) {
+      if (!val) return "";
+      if (val instanceof Date) {
+          // Use the global rounding helper (Ensure roundToNearest30 is in your .gs file)
+          return roundToNearest30(val); 
+      }
+      return String(val).trim();
+  };
+
+  for (var i = 1; i < data.length; i++) {
+    var rowId = String(data[i][col_Order_OrderId] || "").trim().toUpperCase();
+
+    if (rowId === targetId) {
+      if (!masterRow) masterRow = data[i];
+
+      var dateVal = data[i][col_Order_Date];
+      var formattedDate = (dateVal instanceof Date) ? 
+          Utilities.formatDate(dateVal, "GMT+3", "MM/dd/yyyy") : String(dateVal);
+
+      tasks.push({
+        date: formattedDate,
+        startT: safeTime(data[i][col_Order_Time]),     // Correctly uses rounding
+        endT: safeTime(data[i][col_Order_Duration]),   // Correctly uses rounding
+        team: String(data[i][col_Order_Team] || ""),
+        service: String(data[i][col_Order_Service] || "")
+      });
+    }
+  }
+
+  if (!masterRow) return null;
+
+  var htmlAddressLabel = "<option value='Please Select'>Please select</option>";
+  try {
+    var customerPhone = masterRow[col_Order_Phone];
+    var addrSheet = ss.getSheetByName(sheetNameAddress);
+    if (addrSheet) {
+      var dataAddress = addrSheet.getDataRange().getValues();
+      for (var j = 0; j < dataAddress.length; j++) {
+        if (String(dataAddress[j][0]) === String(customerPhone)) {
+          htmlAddressLabel += "<option value='" + customerPhone + "***" + dataAddress[j][1] + "'>" + dataAddress[j][1] + "</option>";
+        }
+      }
+    }
+  } catch(e) {}
+  htmlAddressLabel += "<option value='newaddress'>Add new address</option>";
+
+  // Fix: Ensure Master Row Date is formatted safely
+  var masterDateVal = masterRow[col_Order_Date];
+  var masterFormattedDate = (masterDateVal instanceof Date) ? 
+      Utilities.formatDate(masterDateVal, "GMT+3", "MM/dd/yyyy") : String(masterDateVal);
+
+  var result = [
+    orderId, 
+    masterFormattedDate, 
+    safeTime(masterRow[col_Order_Time]), 
+    safeTime(masterRow[col_Order_Duration]),
+    String(masterRow[col_Order_Service] || "").split(','),
+    masterRow[col_Order_Phone], 
+    masterRow[col_Order_Name],
+    String(masterRow[col_Order_Team] || "").split(','),
+    masterRow[col_Order_Note], 
+    masterRow[col_Order_Status],
+    masterRow[col_Order_AddressLabel], 
+    masterRow[col_Order_AddressLink],
+    masterRow[col_Order_Phone2] || "", 
+    htmlAddressLabel
+  ];
+
+  return { details: result, tasks: tasks, type: type };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasMarkReviewedOrder(orderId) {
+
+    orderId = parseInt(orderId);
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+
+      if (currentOrderId == orderId) {
+
+        var currentStatus = dataOrder[i][col_Order_Status];
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Complete " + currentStatus);
+
+        break;
+
+      }
+
+    }
+
+
+  }
+
+
+  function gasMarkDayComplete(orderId, dateString) {
+    var ss = getSS();
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    // Find the row that matches both OrderID AND Date
+    for (var i in dataOrder) {
+      var rowOrderId = dataOrder[i][col_Order_OrderId];
+      
+      // We need to format the date to match the string passed from the frontend (d MMM YYYY)
+      // Or simpler: compare formatted strings
+      var rowDateFormatted = Utilities.formatDate(dataOrder[i][col_Order_Date], "GMT+3", "d MMM YYYY");
+      
+      if (rowOrderId == orderId && rowDateFormatted == dateString) {
+        // Found the specific day row
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Day Completed");
+        return "Day marked as complete!";
+      }
+    }
+    return "Error: Order not found.";
+  }
+
+
+
+
+
+
+
+  function gasMarkCompletedBackOrder(orderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+
+      if (currentOrderId == orderId) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Complete");
+
+        break;
+
+      }
+
+    }
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+  function gasMarkPaidCashOrder(orderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+      if (currentOrderId.toString() == orderId) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Paid Cash");
+
+        break;
+
+      }
+
+    }
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasMarkPaidPosOrder(orderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+      if (currentOrderId.toString() == orderId) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Paid POS");
+
+        break;
+
+      }
+
+    }
+
+  }
+
+
+
+
+
+
+
+  function gasMarkPaidTransferOrder(orderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+      if (currentOrderId.toString() == orderId) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Paid Transfer");
+
+        break;
+
+      }
+
+    }
+
+  }
+
+
+
+
+
+
+
+
+  function gasMarkPaidChequeOrder(orderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+      if (currentOrderId.toString() == orderId) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Paid Cheque");
+
+        break;
+
+      }
+
+    }
+
+  }
+
+
+
+
+
+
+
+
+
+  function gasMarkPaidLinkOrder(orderId) {
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+      if (currentOrderId.toString() == orderId) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Paid Payment Link");
+
+        break;
+
+      }
+
+    }
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasConvertWaitlistOrder(allFormData) {
+
+    //Create the new order by converting
+    Logger.log(allFormData);
+
+    var date = allFormData[1];
+    var time = allFormData[2];
+    var duration = allFormData[3];
+    var generalService = allFormData[7];
+    var customerPhone = allFormData[4];
+    var customerPhone2 = allFormData[13];
+    var customerName = allFormData[5];
+    var team = allFormData[6];
+    var note = allFormData[8];
+    var selectedOrderType = "Normal Order";
+    var whereKnow = false;
+    var selectedAddress = allFormData[10];
+    var addressLabel = allFormData[11];
+    var addressLink = allFormData[12];
+
+    var allFormDataForCreatingNormalOrder = [date, time, duration, generalService, customerPhone, customerName, team, note, selectedOrderType, whereKnow, selectedAddress, addressLabel, addressLink, true, customerPhone2];
+
+    gasAddNormalOrder(allFormDataForCreatingNormalOrder);
+
+    //Update the waitlist
+    var waitlistId = parseInt(allFormData[0]);
+
+    var ss = getSS();
+    var sheetWaitlist = ss.getSheetByName(sheetNameWaitlist);
+    var dataWaitlist = sheetWaitlist.getDataRange().getDisplayValues();
+
+    for (var i in dataWaitlist) {
+
+      var currentWaitlistId = dataWaitlist[i][col_Order_OrderId];
+
+      if (currentWaitlistId == waitlistId) {
+
+        sheetWaitlist.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Converted");
+
+        break;
+
+      }
+
+    }
+
+    return "The waitlist order has been converted successfully!";
+
+  }
+
+
+
+
+
+
+
+
+
+
+  function gasCancelWaitlistOrder(waitlistId) {
+
+    var ss = getSS();
+
+    var sheetWaitlist = ss.getSheetByName(sheetNameWaitlist);
+    var dataWaitlist = sheetWaitlist.getDataRange().getValues();
+
+    for (var i in dataWaitlist) {
+
+      var currentWaitlistId = dataWaitlist[i][col_Order_OrderId];
+
+      if (currentWaitlistId.toString() == waitlistId) {
+
+        sheetWaitlist.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Cancelled");
+
+        break;
+
+      }
+
+    }
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasUpdateOrder(allFormData, timingChanged) {
+  Logger.log("Updating Order: " + allFormData);
+  var ss = getSS();
+
+  // 1. DATA EXTRACTION
+  var orderId = allFormData[0].toString();
+  var newDateRaw = allFormData[1];
+  var teamString = allFormData[6];
+  var selectedAddress = allFormData[10];
+  var addressLabel = allFormData[11];
+  var addressLink = allFormData[12];
+  var customerPhone2 = allFormData[13];
+  
+  // Standardize the search date for multi-day matching (GMT+3)
+  var targetDateString = Utilities.formatDate(new Date(newDateRaw), "GMT+3", "yyyy-MM-dd");
+
+  // 2. UPDATE THE MASTER "Order" SHEET
+  var sheetOrder = ss.getSheetByName(sheetNameOrder);
+  var dataOrder = sheetOrder.getDataRange().getValues();
+
+  var orderFound = false;
+  for (var i in dataOrder) {
+    var rowOrderId = dataOrder[i][col_Order_OrderId].toString();
+    var rowDateRaw = dataOrder[i][col_Order_Date];
+
+    if (!rowDateRaw) continue;
+    var rowDateString = Utilities.formatDate(new Date(rowDateRaw), "GMT+3", "yyyy-MM-dd");
+
+    // STRICT MATCH: ID and Date must match to prevent overwriting other days in a multi-day set
+    if (rowOrderId == orderId && rowDateString == targetDateString) {
+      
+      // Update core columns (Index 0 to 9)
+      sheetOrder.getRange(parseInt(i) + 1, 1, 1, 10).setValues([[
+        allFormData[0], allFormData[1], allFormData[2], allFormData[3], 
+        allFormData[4], allFormData[5], allFormData[6], allFormData[7], 
+        allFormData[8], allFormData[9]
+      ]]);
+
+      // Update address and secondary phone columns
+      sheetOrder.getRange(parseInt(i) + 1, col_Order_AddressLabel + 1, 1, 3).setValues([[
+        addressLabel, addressLink, customerPhone2
+      ]]);
+      
+      orderFound = true;
+      break; 
+    }
+  }
+
+  // 3. UPDATE THE "OrderScheduled" SHEET (The View)
+  var sheetOrderScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+  var dataOrderScheduled = sheetOrderScheduled.getDataRange().getValues();
+
+  for (var j in dataOrderScheduled) {
+    var schId = dataOrderScheduled[j][col_Order_OrderId].toString();
+    var schDateRaw = dataOrderScheduled[j][col_Order_Date];
+    
+    if (!schDateRaw) continue;
+    var schDateString = Utilities.formatDate(new Date(schDateRaw), "GMT+3", "yyyy-MM-dd");
+
+    if (schId == orderId && schDateString == targetDateString) {
+      // Update the Scheduled Sheet row
+      sheetOrderScheduled.getRange(parseInt(j) + 1, 1, 1, 10).setValues([[
+          allFormData[0], allFormData[1], allFormData[2], allFormData[3], 
+          allFormData[4], allFormData[5], allFormData[6], allFormData[7], 
+          allFormData[8], allFormData[9]
+      ]]);
+
+      // Update Address metadata
+      sheetOrderScheduled.getRange(parseInt(j) + 1, col_Order_AddressLabel + 1, 1, 3).setValues([[
+        addressLabel, addressLink, customerPhone2
+      ]]);
+      break; 
+    }
+  }
+
+  // 4. HANDLE CUSTOMER DATABASE & NEW ADDRESSES
+  if (selectedAddress == 'newaddress') {
+    var sheetAddr = ss.getSheetByName(sheetNameAddress);
+    sheetAddr.appendRow([allFormData[4], addressLabel, addressLink]);
+  }
+
+  var sheetCustomer = ss.getSheetByName(sheetNameCustomer);
+  var dataCust = sheetCustomer.getDataRange().getValues();
+  dataCust.shift();
+  var phoneArray = flatten(sliceArray(dataCust, 0, 1));
+  var custIndex = phoneArray.indexOf(parseInt(allFormData[4]));
+
+  if (custIndex < 0) {
+    sheetCustomer.appendRow([allFormData[4], allFormData[5]]);
+  } else {
+    sheetCustomer.getRange(custIndex + 2, 2).setValue(allFormData[5]);
+  }
+
+  // 5. NOTIFICATIONS
+  if (timingChanged) {
+     //Send Whatsapp meesage - Order Rescheduled
+
+      var templateType = 'order_rescheduled';
+
+      var templateName = '';
+
+      var broadcastName = '';
+
+      var phoneNumber = allFormData[5];
+
+      var arrayParameters = [];
+
+      //var arrayParameters = [ordernumber,dayarabic,datearabic,time,callcenternumber,dayenglish,dateenglish]; //This is the guide
+  }
+
+  return orderFound ? "The order has been updated successfully!" : "Warning: Exact order day not found for ID " + orderId + " on " + targetDateString;
+}
+
+function gasUpdateOrderNew(p) {
+  var ss = getSS();
+  var sheetOrder = ss.getSheetByName(sheetNameOrder);
+  var sheetScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+  
+  var safeParseDate = function(dateStr) {
+    if (!dateStr || dateStr == "undefined") return new Date();
+    // Handles MM/DD/YYYY or YYYY-MM-DD
+    var parts = dateStr.split(/[\/\-]/);
+    if (parts.length < 3) return new Date();
+    if (parts[2].length === 4) return new Date(parts[2], parts[0] - 1, parts[1]);
+    if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]);
+    return new Date(dateStr);
+  };
+
+  // Update Master Sheet
+  var masterData = sheetOrder.getDataRange().getValues();
+  for (var i = 1; i < masterData.length; i++) {
+    if (masterData[i][col_Order_OrderId].toString() === p.orderId) {
+      var rowNum = i + 1;
+      sheetOrder.getRange(rowNum, col_Order_Name + 1).setValue(p.name);
+      sheetOrder.getRange(rowNum, col_Order_Status + 1).setValue(p.status);
+      sheetOrder.getRange(rowNum, col_Order_Note + 1).setValue(p.note);
+      sheetOrder.getRange(rowNum, col_Order_Phone + 1).setValue(p.phone);
+      sheetOrder.getRange(rowNum, col_Order_AddressLabel + 1).setValue(p.addressLabel);
+      sheetOrder.getRange(rowNum, col_Order_AddressLink + 1).setValue(p.addressLink);
+      break; 
+    }
+  }
+
+  // Sync Scheduled Sheet
+  var schedData = sheetScheduled.getDataRange().getValues();
+  for (var j = schedData.length - 1; j >= 1; j--) {
+    if (schedData[j][col_Order_OrderId].toString() === p.orderId) {
+      sheetScheduled.deleteRow(j + 1);
+    }
+  }
+
+  p.assignments.forEach(function(row) {
+    var newRow = new Array(21).fill("");
+    newRow[0] = p.orderId;
+    newRow[1] = safeParseDate(row.date);
+    newRow[2] = row.startT;
+    newRow[3] = row.endT;
+    newRow[4] = p.phone;
+    newRow[5] = p.name;
+    newRow[6] = row.team;
+    newRow[7] = row.service;
+    newRow[8] = p.note;
+    newRow[9] = p.status;
+    newRow[18] = p.addressLabel;
+    newRow[19] = p.addressLink;
+    newRow[20] = p.phone2;
+    sheetScheduled.appendRow(newRow);
+  });
+  
+  return "Sync complete for " + p.orderId;
+}
+
+
+
+function gasGetCompletedServices(orderId) {
+  var ss = getSS();
+  // Check for both common names of the sheet
+  var sheetExec = ss.getSheetByName("OrderExecution") || ss.getSheetByName("Order Execution");
+  
+  if (!sheetExec) {
+    Logger.log("❌ Error: 'OrderExecution' sheet not found.");
+    return { services: [], teams: [] }; 
+  }
+
+  var dataExec = sheetExec.getDataRange().getValues();
+  dataExec.shift(); // Remove header
+
+  var servicesFound = [];
+  var teamsFound = []; 
+  
+  // 1. Clean the ID we are looking for (Remove spaces, lowercase)
+  var targetIdClean = String(orderId).replace(/\s/g, '').toLowerCase();
+
+  Logger.log("🔍 Searching DB for Order ID: " + orderId + " (Target Clean: " + targetIdClean + ")");
+
+  for (var i = 0; i < dataExec.length; i++) {
+    // 2. Clean the ID in the Database Row
+    var rowIdRaw = dataExec[i][1]; // Column 2 is Order ID
+    if (!rowIdRaw) continue;
+    var rowIdClean = String(rowIdRaw).replace(/\s/g, '').toLowerCase();
+    
+    // 3. Compare
+    if (rowIdClean === targetIdClean) {
+      var rowTeam = String(dataExec[i][3]).trim();      
+      var serviceString = String(dataExec[i][6]).trim(); 
+
+      Logger.log("   ✅ Match Found in Row " + (i+2) + " | Services: " + serviceString);
+      
+      if (teamsFound.indexOf(rowTeam) === -1) teamsFound.push(rowTeam);
+
+      // --- SMART SPLIT FIX START ---
+      var splitServices;
+      if (serviceString.indexOf(" || ") !== -1) {
+         // Use new separator
+         splitServices = serviceString.split(" || ");
+      } else {
+         // Fallback to old comma separator if || is missing
+         splitServices = serviceString.split(", ");
+      }
+      // --- SMART SPLIT FIX END ---
+
+      for (var k = 0; k < splitServices.length; k++) {
+        var rawItem = splitServices[k];
+        if (!rawItem) continue;
+
+        // 1. Get cached price from string {Price:1125}
+        var priceMatch = rawItem.match(/\{Price:([\d\.]+)\}/i);
+        var cachedPrice = priceMatch ? parseFloat(priceMatch[1]) : 0.00;
+
+        // 2. Clean Name & Parse Qty
+        var cleanName = rawItem.replace(/\{Price:[\d\.]+\}/i, "").trim();
+        var qty = 1;
+        var qtyMatch = cleanName.match(/\(Qty:\s*(\d+)\s*(.*?)\)/i);
+        var unitRaw = "";
+        
+        if (qtyMatch) {
+            qty = parseInt(qtyMatch[1]);
+            unitRaw = qtyMatch[2];
+        }
+
+        // 3. Parse Main - Sub1 - Sub2 (Hyphen Fix included)
+        var nameOnly = cleanName.replace(/\(Qty:.*?\)/, "").trim();
+        var nameClean = nameOnly.replace(/\[.*?\]/g, "").trim(); 
+        var parts = nameClean.split(" - ");
+        
+        var main = parts[0] || "";
+        var sub1 = parts[1] || "";
+        var sub2 = parts.slice(2).join(" - ") || ""; // Join remaining parts
+
+        // 4. CHECK MATCH & RECALCULATE
+        var liveObj = calculatePriceInternal(main, sub1, sub2, qty);
+        var isMatched = (parseFloat(liveObj.total) > 0);
+
+        var finalTotal = cachedPrice;
+        var finalUnitPrice = (qty > 0) ? (cachedPrice / qty).toFixed(2) : "0.00";
+        
+        // Priority: If DB has 0.00 but Service List finds a match, use Service List
+        if (cachedPrice === 0 && isMatched) {
+            finalTotal = parseFloat(liveObj.total);
+            finalUnitPrice = liveObj.unitPrice;
+        }
+
+        servicesFound.push({
+          team: rowTeam,
+          main: main,
+          sub1: sub1,
+          sub2: sub2,
+          qty: qty,
+          unit: unitRaw || liveObj.unitEn, 
+          unitPrice: finalUnitPrice,
+          total: finalTotal.toFixed(2),
+          descEn: liveObj.descEn,
+          descAr: liveObj.descAr,
+          unitAr: liveObj.unitAr,
+          unitEn: liveObj.unitEn,
+          isMatched: isMatched
+        });
+      }
+    }
+  }
+  
+  Logger.log("   -> Final count for Invoice: " + servicesFound.length + " items.");
+  return { services: servicesFound, teams: teamsFound };
+}
+
+  function gasUpdateCompletedOrderStatus(allFormData) {
+
+    Logger.log(allFormData);
+
+    if (allFormData[1] == "None") { return "New status was not selected."; }
+
+    var ss = getSS();
+
+    var sheetOrder = ss.getSheetByName(sheetNameOrder);
+    var dataOrder = sheetOrder.getDataRange().getValues();
+
+
+    for (var i in dataOrder) {
+
+      var currentOrderId = dataOrder[i][col_Order_OrderId];
+
+      if (currentOrderId == allFormData[0]) {
+
+        sheetOrder.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue(allFormData[1]);
+
+        break;
+
+      }
+
+    }
+
+    return "The order has been updated successfully!";
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function gasGetSub1(mainSub) {
+
+    var ss = getSS();
+
+    var sheetServiceList = ss.getSheetByName(sheetNameServiceList);
+    var dataServiceList = sheetServiceList.getDataRange().getValues();
+
+    //Remove first row
+    dataServiceList.shift();
+
+    //Get the general service list
+    var mainAndSub1 = sliceArray(dataServiceList, 0, 2);
+
+    var arrayMatchedSub1 = [];
+
+    for (var i in mainAndSub1) {
+
+      var currentMain = mainAndSub1[i][0];
+
+      if (currentMain == mainSub) {
+
+        arrayMatchedSub1.push(mainAndSub1[i][1]);
+
+      }
+
+    }
+
+    arrayMatchedSub1 = unique(arrayMatchedSub1);
+
+    return arrayMatchedSub1;
+
+  }
+
+
+
+
+
+
+
+
+
+
+  function gasGetSub2(main, sub1) {
+
+    var ss = getSS();
+
+    var sheetServiceList = ss.getSheetByName(sheetNameServiceList);
+    var dataServiceList = sheetServiceList.getDataRange().getValues();
+
+    //Remove first row
+    dataServiceList.shift();
+
+    //Get the general service list
+    var mainAndSub1AndSub2 = sliceArray(dataServiceList, 0, 3);
+
+    var arrayMatchedSub2 = [];
+
+    for (var i in mainAndSub1AndSub2) {
+
+      var currentMain = mainAndSub1AndSub2[i][0];
+      var currentSub1 = mainAndSub1AndSub2[i][1];
+
+      if (currentMain == main && currentSub1 == sub1) {
+
+        arrayMatchedSub2.push(mainAndSub1AndSub2[i][2]);
+
+      }
+
+    }
+
+    arrayMatchedSub2 = unique(arrayMatchedSub2);
+
+    return arrayMatchedSub2;
+
+  }
+
+
+
+
+
+
+
+
+
+  function gasGetUnit(main, sub1, sub2) {
+
+    var ss = getSS();
+
+    var sheetServiceList = ss.getSheetByName(sheetNameServiceList);
+    var dataServiceList = sheetServiceList.getDataRange().getValues();
+
+    //Remove first row
+    dataServiceList.shift();
+
+    //Get the general service list
+    var mainAndSub1AndSub2AnUnit = sliceArray(dataServiceList, 0, 5);
+
+    var matchedUnit = "";
+
+    Logger.log(main + sub1 + sub2);
+
+    for (var i in mainAndSub1AndSub2AnUnit) {
+
+      var currentMain = mainAndSub1AndSub2AnUnit[i][0];
+      var currentSub1 = mainAndSub1AndSub2AnUnit[i][1];
+      var currentSub2 = mainAndSub1AndSub2AnUnit[i][2];
+
+      Logger.log(currentMain + currentSub1 + currentSub2);
+
+      if (currentMain == main && currentSub1 == sub1 && currentSub2 == sub2) {
+
+        Logger.log(2);
+
+        matchedUnit = mainAndSub1AndSub2AnUnit[i][4];
+
+        break;
+
+      }
+
+    }
+
+    return matchedUnit;
+
+  }
+
+
+
+
+
+
+
+
+
+
+  function gasCalculateServiceCost(main, sub1, sub2, qty) {
+
+
+    var ss = getSS();
+
+    var sheetServiceList = ss.getSheetByName(sheetNameServiceList);
+    var dataServiceList = sheetServiceList.getDataRange().getValues();
+
+    //Remove first row
+    dataServiceList.shift();
+
+    //Get the general service list
+    var mainAndSub1AndSub2AndPrice = sliceArray(dataServiceList, 0, 4);
+
+    for (var i in mainAndSub1AndSub2AndPrice) {
+
+      var currentMain = mainAndSub1AndSub2AndPrice[i][0];
+      var currentSub1 = mainAndSub1AndSub2AndPrice[i][1];
+      var currentSub2 = mainAndSub1AndSub2AndPrice[i][2];
+
+      if (currentMain == main && currentSub1 == sub1 && currentSub2 == sub2) {
+
+        var total = mainAndSub1AndSub2AndPrice[i][3] * qty;
+
+      }
+
+    }
+
+    return total;
+
+
+  }
+
+
+
+
+  /* =========================================
+   SANITIZED SUBMISSION (The "Root Cause" Fix)
+   - Cleans data BEFORE saving to DB
+   - Removes brackets [...] so names match Price List
+   ========================================= */
+function gasSubmitDailyServices(data) {
+  var ss = getSS();
+  var sheetExec = ss.getSheetByName("OrderExecution");
+  var sheetScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+  
+  // 1. Parse Data
+  var orderId = String(data[0]).trim(); // Ensure string and trim
+  var dateRaw = data[1]; 
+  var team = String(data[2]).trim(); 
+  var rawServices = data[3]; 
+  var startTime = data[4];
+  var endTime = data[5];
+  
+  var formattedDate = Utilities.formatDate(new Date(dateRaw), "GMT+3", "yyyy-MM-dd");
+  var timestamp = new Date();
+  var execId = "EXEC-" + Utilities.formatDate(timestamp, "GMT+3", "yyMMddHHmmss");
+
+  // --- 2. SANITIZATION ---
+  var cleanServices = rawServices;
+  if (rawServices) {
+    var serviceList = rawServices.split(", ");
+    var cleanedList = serviceList.map(function(item) {
+        var qtyMatch = item.match(/\(Qty:\s*(\d+)\s*(.*?)\)$/i);
+        var qtySuffix = qtyMatch ? qtyMatch[0] : "";
+        var namePart = item.replace(qtySuffix, "").trim();
+        var officialName = namePart.replace(/\[.*?\]/g, "").trim();
+        return officialName + " " + qtySuffix;
+    });
+    cleanServices = cleanedList.join(" || ");
+  }
+  
+  // 3. Save to OrderExecution
+  sheetExec.appendRow([
+    execId, orderId, formattedDate, team, startTime, endTime, cleanServices, "Day Completed", timestamp
+  ]);
+  
+  // CRITICAL FIX: Force Google Sheets to apply changes immediately
+  SpreadsheetApp.flush(); 
+  
+  // 4. Update Status in 'OrderScheduled'
+  var dataSch = sheetScheduled.getDataRange().getValues();
+  var found = false;
+  
+  for (var i in dataSch) {
+    var rowId = dataSch[i][col_Order_OrderId];
+    var rowDate = dataSch[i][col_Order_Date];
+    var rowTeam = String(dataSch[i][col_Order_Team]).trim(); 
+    
+    if(!rowDate) continue;
+    var rowDateStr = Utilities.formatDate(new Date(rowDate), "GMT+3", "yyyy-MM-dd");
+
+    if (String(rowId) == orderId && rowDateStr == formattedDate && (rowTeam == team || rowTeam.indexOf(team) > -1)) {
+      sheetScheduled.getRange(parseInt(i) + 1, col_Order_Status + 1).setValue("Day Completed");
+      found = true;
+      break; 
+    }
+  }
+  
+  // Apply the status update immediately as well
+  SpreadsheetApp.flush();
+
+  // --- 5. CHECK RELAY STATUS (Is Job Done?) ---
+  var isJobDone = true;
+  var updatedDataSch = sheetScheduled.getDataRange().getValues(); 
+
+  for (var k = 1; k < updatedDataSch.length; k++) { 
+      var checkId = updatedDataSch[k][col_Order_OrderId];
+      var checkStatus = updatedDataSch[k][col_Order_Status];
+
+      // Robust check: Remove spaces to ensure matching
+      if (String(checkId).replace(/\s/g,'') == orderId.replace(/\s/g,'')) {
+          if (checkStatus !== "Day Completed" && checkStatus !== "Completed") {
+              isJobDone = false;
+              break;
+          }
+      }
+  }
+  
+  return { 
+      status: "success", 
+      message: found ? "Day's work submitted successfully!" : "Log saved (Status Check Warning).", 
+      isJobDone: isJobDone, 
+      orderId: orderId 
+  };
+}
+/* ----------------------------------------------------------------
+   HELPER FUNCTION: Calculate Price Internal (Smart Match)
+   - Strips brackets [...] from Service List to match Database
+   ---------------------------------------------------------------- */
+function calculatePriceInternal(main, sub1, sub2, qty) {
+  var ss = getSS();
+  var sheet = ss.getSheetByName(sheetNameServiceList); 
+  var data = sheet.getDataRange().getValues();
+
+  var unitPrice = 0;
+  var unitEn = "";
+  var unitAr = "";
+  var descAr = "";
+  var descEn = main + (sub1 ? " - " + sub1 : "") + (sub2 ? " - " + sub2 : "");
+
+  // Normalize INPUTS (from Database)
+  // Remove brackets and trim just in case
+  var cleanInput = function(str) { return String(str).replace(/\[.*?\]/g, "").trim().toLowerCase(); };
+  
+  var inMain = cleanInput(main);
+  var inSub1 = cleanInput(sub1);
+  var inSub2 = cleanInput(sub2);
+
+  // Loop through Service List (Skip header)
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+
+    // Normalize REFERENCE (from Service List)
+    var rMain = cleanInput(row[0]);
+    var rSub1 = cleanInput(row[1]);
+    var rSub2 = cleanInput(row[2]);
+
+    // STRICT MATCH on cleaned strings
+    if (rMain == inMain && rSub1 == inSub1 && rSub2 == inSub2) {
+       unitPrice = row[3];
+       unitEn = row[4];
+       unitAr = row[5];
+       if (row[6]) descEn = row[6];
+       if (row[7]) descAr = row[7];
+       break; 
+    }
+  }
+
+  var total = (parseFloat(unitPrice) * parseInt(qty)).toFixed(2);
+
+  return {
+    unitPrice: parseFloat(unitPrice).toFixed(2),
+    total: total,
+    descEn: descEn,
+    descAr: descAr,
+    unitEn: unitEn,
+    unitAr: unitAr
+  };
+}
+
+
+
+
+function processSubmittedInvoice(orderNumber, customerName, customerPhone, arrayServices, building, street, zone, file, fileExist, signature, paymentStatus, teamName, subtotalSparePart, subtotalLocation, subtotalDiscount, _ignoredTotal) {
+
+  Logger.log("🔵 START INVOICE GENERATION for " + orderNumber);
+
+  var allServices = [];
+
+  // --- STEP 1: GATHER DATA ---
+  if (arrayServices && arrayServices.length > 0) {
+      var firstRow = arrayServices[0];
+      if (firstRow[0] == "Service Category" || firstRow[0] == "Main") {
+          arrayServices.shift();
+      }
+
+      for (var i = 0; i < arrayServices.length; i++) {
+        var row = arrayServices[i];
+        if (!row[0]) continue; 
+
+        var main = String(row[0] || "").trim();
+        var sub1 = String(row[1] || "").trim();
+        var sub2 = String(row[2] || "").trim();
+        var qty = parseFloat(row[3]) || 0; 
+        var frontendTotal = parseFloat(row[4]) || 0; 
+        
+        var priceObj = calculatePriceInternal(main, sub1, sub2, qty);
+        
+        var finalTotal = frontendTotal; 
+        var finalUnitPrice = (qty > 0) ? (frontendTotal / qty).toFixed(2) : "0.00";
+
+        if (frontendTotal === 0 && parseFloat(priceObj.total) > 0) {
+             finalTotal = parseFloat(priceObj.total);
+             finalUnitPrice = priceObj.unitPrice;
+        }
+
+        allServices.push({
+          main: main,
+          sub1: sub1,
+          sub2: sub2,
+          qty: qty,
+          unit: "", 
+          unitPrice: finalUnitPrice, 
+          total: finalTotal.toFixed(2),     
+          descEn: priceObj.descEn,
+          descAr: priceObj.descAr,
+          unitAr: priceObj.unitAr,
+          unitEn: priceObj.unitEn
+        });
+      }
+
+  } else {
+      var dbFetch = gasGetCompletedServices(orderNumber);
+      allServices = dbFetch.services || [];
+  }
+
+  // --- STEP 2.5: MERGE DUPLICATES ---
+  var mergedMap = {};
+  var mergedList = [];
+
+  for (var i = 0; i < allServices.length; i++) {
+    var item = allServices[i];
+    var key = (item.main || "") + "||" + (item.sub1 || "") + "||" + (item.sub2 || "");
+
+    if (mergedMap[key]) {
+        mergedMap[key].qty += parseFloat(item.qty);
+        var currentTotal = parseFloat(mergedMap[key].total);
+        var addTotal = parseFloat(item.total);
+        mergedMap[key].total = (currentTotal + addTotal).toFixed(2);
+        
+        if (mergedMap[key].qty > 0) {
+             mergedMap[key].unitPrice = (mergedMap[key].total / mergedMap[key].qty).toFixed(2);
+        }
+    } else {
+        item.qty = parseFloat(item.qty);
+        mergedMap[key] = item;
+        mergedList.push(item); 
+    }
+  }
+  allServices = mergedList;
+
+  // --- STEP 3: RECALCULATE TOTALS ---
+  var subtotalServices = 0.0;
+  for (var i = 0; i < allServices.length; i++) {
+    subtotalServices += parseFloat(allServices[i].total || 0);
+  }
+  
+  var valSpare = parseFloat(subtotalSparePart) || 0;
+  var valLoc = parseFloat(subtotalLocation) || 0;
+  var valDisc = parseFloat(subtotalDiscount) || 0;
+  var totalAmount = subtotalServices + valSpare + valLoc - valDisc;
+
+  // --- STEP 4: GENERATE DOCUMENT ---
+  var ssCentralizedInvoice = SpreadsheetApp.openByUrl(invoiceSheetUrl);
+  var sheetInvoiceCentralized = ssCentralizedInvoice.getSheetByName("Invoice");
+  var newInvoiceId = getInvoiceId(ssCentralizedInvoice);
+  var timestamp = new Date();
+  var formattedDate = Utilities.formatDate(timestamp, "GMT+3", "dd/MM/YYYY");
+  
+  var ss = getSS();
+  var sheetInvoice = ss.getSheetByName(sheetNameInvoice);
+  var sheetCompletedServices = ss.getSheetByName(sheetNameCompletedServices);
+
+  var folder = DriveApp.getFolderById("10WAJnrzTI4ZocLN4APOn69i0RaWN04Gp");
+  var newFolder = folder.createFolder("Order " + orderNumber + " - " + customerPhone);
+  var templateInvoice = DriveApp.getFileById("1JwbELB7Hrl6GmfKqtKVVvEtl8Hb9FE84Teyv-CgCFww");
+  var newInvoice = templateInvoice.makeCopy("Invoice - Order " + orderNumber, newFolder);
+  
+  var docApp = DocumentApp.openById(newInvoice.getId());
+  var body = docApp.getBody();
+
+  if (fileExist && file) {
+    var contentType = file.substring(5, file.indexOf(';'));
+    var bytes = Utilities.base64Decode(file.substr(file.indexOf('base64,') + 7));
+    var photoBlob = Utilities.newBlob(bytes, contentType, "Spare part receipt " + orderNumber);
+    newFolder.createFile(photoBlob);
+    
+    var para = body.getParagraphs();
+    if (para[76]) para[76].insertInlineImage(0, photoBlob).setWidth(700).setHeight(800);
+  }
+
+  body.replaceText("<<D>>", formattedDate);
+  body.replaceText("<<I>>", newInvoiceId);
+  body.replaceText("<<B>>", building);
+  body.replaceText("<<S>>", street);
+  body.replaceText("<<Z>>", zone);
+  body.replaceText("<<NAME>>", customerName);
+  body.replaceText("<<PHONE>>", customerPhone);
+  body.replaceText("<<LABOR>>", addComma(subtotalServices.toFixed(2)));
+  body.replaceText("<<SPARE>>", addComma(valSpare.toFixed(2)));
+  body.replaceText("<<LOCATION>>", addComma(valLoc.toFixed(2)));
+  body.replaceText("<<DISCOUNT>>", addComma(valDisc.toFixed(2)));
+  body.replaceText("<<TOTAL>>", addComma(totalAmount.toFixed(2)));
+
+  var table = body.getTables()[2];
+
+  // --- STEP 5: STYLE SETTINGS (UPDATED) ---
+  var styleEvenRow = {}; styleEvenRow[DocumentApp.Attribute.BACKGROUND_COLOR] = '#FFFFFF';
+  var styleOddRow = {}; styleOddRow[DocumentApp.Attribute.BACKGROUND_COLOR] = '#d9d9d9';
+  
+  // Clean Text Style (Bigger + No Underline)
+  var styleText = {}; 
+  styleText[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.HorizontalAlignment.CENTER;
+  styleText[DocumentApp.Attribute.FONT_SIZE] = 12; // <--- INCREASED SIZE
+  styleText[DocumentApp.Attribute.UNDERLINE] = false; // <--- FORCE NO UNDERLINE
+  styleText[DocumentApp.Attribute.BOLD] = false;
+
+  for (var i = 0; i < allServices.length; i++) {
+    var item = allServices[i];
+    var tr = table.appendTableRow();
+    
+    // DB Record
+    sheetCompletedServices.appendRow([
+        orderNumber, 
+        timestamp, 
+        item.main, 
+        item.sub1, 
+        item.sub2, 
+        item.qty, 
+        item.unitPrice, 
+        teamName        
+    ]);
+
+    var td0 = tr.appendTableCell(addComma(String(item.total))); 
+    var td1 = tr.appendTableCell(String(item.qty)); 
+    var td2 = tr.appendTableCell((item.unitAr || "") + '\n' + (item.unitEn || "")); 
+    var td3 = tr.appendTableCell(item.unitPrice || "0.00"); 
+    var td4 = tr.appendTableCell((item.descAr || "") + '\n' + (item.descEn || "")); 
+
+    var styleRow = (i % 2 == 0) ? styleEvenRow : styleOddRow;
+    
+    // Apply Styles Robustly
+    [td0, td1, td2, td3, td4].forEach(function(td) { 
+        var para = td.getChild(0).asParagraph();
+        
+        // 1. Apply to the paragraph container
+        para.setAttributes(styleText);
+        
+        // 2. FORCE apply to the text element itself (Double Safety against underlines)
+        if (para.getNumChildren() > 0) {
+             para.getChild(0).setAttributes(styleText);
+        }
+
+        td.setAttributes(styleRow); 
+    });
+  }
+
+  docApp.saveAndClose();
+  var pdf = newFolder.createFile(docApp.getAs('application/pdf')).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var pdfUrl = pdf.getUrl();
+
+  sheetInvoice.appendRow([newInvoiceId, "Invoice - Order " + orderNumber, pdfUrl]);
+  sheetInvoiceCentralized.appendRow([newInvoiceId, orderNumber, "Invoice - Order " + orderNumber, pdfUrl, subtotalServices, valLoc, valDisc, valSpare]);
+
+  updateOrderStatus(ss, orderNumber, paymentStatus, pdfUrl, subtotalServices, valLoc, valDisc, valSpare, newInvoiceId, building, street, zone);
+
+  return [pdfUrl, customerPhone];
+}
+
+function updateOrderStatus(ss, orderNumber, paymentStatus, pdfUrl, labor, loc, disc, spare, invNum, b, s, z) {
+  Logger.log("🔄 Updating Status for Order: " + orderNumber + " -> " + paymentStatus);
+  
+  // Clean the ID to ensure we find a match
+  var cleanId = String(orderNumber).trim();
+  
+  // --- 1. UPDATE MASTER ORDER SHEET ---
+  var sheetOrder = ss.getSheetByName(sheetNameOrder);
+  var dataOrder = sheetOrder.getDataRange().getValues();
+  
+  var foundMaster = false;
+  for (var k = 1; k < dataOrder.length; k++) { // Start loop at 1 to skip header
+    var rowId = String(dataOrder[k][col_Order_OrderId]).trim();
+    
+    if (rowId === cleanId) {
+      // We found the order! Now update status and financial info.
+      var rowNum = k + 1;
+      
+      // Combine Address parts nicely
+      var addressStr = "'" + b + " " + s + " " + z; 
+      
+      // Data to save: Status, PDF Link, Date, Labor, Location, Discount, Spare, Invoice#, Address
+      var updateArray = [[
+          paymentStatus, 
+          pdfUrl, 
+          new Date(), 
+          labor, 
+          loc, 
+          disc, 
+          spare, 
+          invNum, 
+          addressStr
+      ]];
+      
+      // Column J (Status) is Index 9. getRange uses 1-based index (10).
+      // This writes to columns J, K, L, M, N, O, P, Q, R
+      sheetOrder.getRange(rowNum, col_Order_Status + 1, 1, updateArray[0].length).setValues(updateArray);
+      
+      Logger.log("   ✅ Master Order Updated at Row " + rowNum);
+      foundMaster = true;
+      break; // Stop after updating the Master row
+    }
+  }
+  
+  if (!foundMaster) Logger.log("   ❌ Error: Master Order ID not found in 'Order' sheet.");
+
+  // --- 2. UPDATE SCHEDULE SHEET ---
+  // We mark these rows as "Completed" so they disappear from the Daily View
+  var sheetScheduled = ss.getSheetByName(sheetNameOrderScheduled);
+  var dataScheduled = sheetScheduled.getDataRange().getValues();
+  
+  for (var j = 1; j < dataScheduled.length; j++) {
+    var schId = String(dataScheduled[j][col_Order_OrderId]).trim();
+    
+    if (schId === cleanId) {
+       // Set Status (Column J) to "Completed"
+       sheetScheduled.getRange(j + 1, 10).setValue("Completed");
+    }
+  }
+  
+  // Force update immediately
+  SpreadsheetApp.flush();
+}
+
+
+
+
+  //Flatten the array from 2d to 1d
+  function flatten(array) {
+
+    return result = [].concat.apply([], array);
+
+  }
+
+
+
+
+
+
+
+  //Slice the 2d array
+  function sliceArray(array, start, end) {
+
+    var subsections = array.map(function (subarray) {
+      return subarray.slice(start, end);
+    })
+
+    return subsections;
+
+  }
+
+
+
+
+  //Return unique array
+  function unique(a) {
+    var seen = {};
+    var out = [];
+    var len = a.length;
+    var j = 0;
+    for (var i = 0; i < len; i++) {
+      var item = a[i];
+      if (seen[item] !== 1) {
+        seen[item] = 1;
+        out[j++] = item;
+      }
+    }
+    return out;
+  }
+
+
+
+
+  //Add thousand comma
+  function addComma(number) {
+
+    return number.replace(/(\d)(?=(\d{3})+\.)/g, '$1,');
+
+  }
+  
+/**
+ * Updates a specific service entry in the OrderExecution sheet.
+ */
+function gasUpdateExecutionRecord(orderId, teamName, newServiceString) {
+  var ss = getSS();
+  var sheetExec = ss.getSheetByName("OrderExecution") || ss.getSheetByName("Order Execution");
+  var data = sheetExec.getDataRange().getValues();
+  
+  for (var i = 1; i < data.length; i++) {
+    // Match ID and Team to find the specific log
+    if (data[i][1].toString() === orderId.toString() && data[i][3].toString() === teamName) {
+      sheetExec.getRange(i + 1, 7).setValue(newServiceString); // Column 7 is Services
+      SpreadsheetApp.flush();
+      return "Success: Record updated.";
+    }
+  }
+  return "Error: Could not find original record for " + orderId;
+}
+
+/* =========================================================================
+   FULL CYCLE DEBUG: Simulate Order Creation -> Team Log -> Final Invoice
+   ========================================================================= */
+/* =========================================================================
+   FULL CYCLE DEBUG: Simulate Order Creation -> Team Log -> Final Invoice
+   ========================================================================= */
+function TEST_Full_Cycle_Debug() {
+  var ss = getSS();
+  
+  Logger.log("🚀 STARTING FULL CYCLE TEST...");
+
+  // --- STEP 1: CREATE A TEST ORDER ---
+  var testOrderId = getOrderId("MD") + "-TEST"; 
+  var today = new Date();
+  var dateStr = Utilities.formatDate(today, "GMT+3", "yyyy-MM-dd");
+  
+  Logger.log("👉 Step 1: Creating Test Order ID: " + testOrderId);
+
+  var sheetScheduled = ss.getSheetByName("OrderScheduled");
+  var sheetOrder = ss.getSheetByName("Order");
+  
+  // Create Master Record
+  sheetOrder.appendRow([
+    testOrderId, dateStr, "9:00 AM", "5:00 PM", "99999999", "TEST CUSTOMER", 
+    "Team 1, Team 2", "Test Service", "Test Note", "Scheduled", 
+    "", "", "", "", "", "", "", "", "Home", "No Link", ""
+  ]);
+
+  // Create Scheduled Rows
+  sheetScheduled.appendRow([testOrderId, dateStr, "9:00 AM", "5:00 PM", "99999999", "TEST CUSTOMER", "Team 1", "Service A", "Note", "Scheduled"]);
+  sheetScheduled.appendRow([testOrderId, dateStr, "9:00 AM", "5:00 PM", "99999999", "TEST CUSTOMER", "Team 2", "Service B", "Note", "Scheduled"]);
+
+  Logger.log("✅ Order Created.");
+
+  // --- STEP 2: TEAM 1 SUBMITS WORK (WITH TYPO) ---
+  Logger.log("👉 Step 2: Team 1 Submitting Daily Work (With Typo 'Granete')...");
+  
+  var dirtyServiceString = "Polishing - Granete - Floor-Severe (Qty: 25 m2) {Price:1125}"; 
+  
+  var team1Data = [testOrderId, dateStr, "Team 1", dirtyServiceString, "9:00 AM", "12:00 PM"];
+  gasSubmitDailyServices(team1Data);
+  
+  Logger.log("✅ Team 1 Work Logged.");
+
+  // --- STEP 3: TEAM 2 GENERATES INVOICE ---
+  Logger.log("👉 Step 3: Team 2 Generating Invoice (Fetching Data)...");
+  
+  var fetchResult = gasGetCompletedServices(testOrderId);
+  
+  // --- STEP 4: VERIFICATION ---
+  Logger.log("🔍 VERIFYING RESULTS...");
+  
+  var foundTeam1Service = false;
+  var priceIsCorrect = false;
+  var isMatchedFlag = false;
+
+  for (var i = 0; i < fetchResult.services.length; i++) {
+    var s = fetchResult.services[i];
+    
+    // FIX: Check Main, Sub1, AND Sub2 for the typo keyword
+    var fullName = (s.main + " " + s.sub1 + " " + s.sub2).toLowerCase();
+    
+    if (s.team === "Team 1" && fullName.indexOf("granete") !== -1) {
+      foundTeam1Service = true;
+      
+      Logger.log("   Found Item: [" + s.main + " - " + s.sub1 + "] | Total: " + s.total + " | Matched DB: " + s.isMatched);
+      
+      // CHECK 1: Price
+      if (parseFloat(s.total) === 1125) {
+        priceIsCorrect = true;
+      } else {
+        Logger.log("   ❌ ERROR: Expected 1125, got " + s.total);
+      }
+
+      // CHECK 2: Match Flag (Should be FALSE because Granete is a typo)
+      if (s.isMatched === false) {
+        isMatchedFlag = true;
+      } else {
+        Logger.log("   ❌ ERROR: isMatched should be FALSE for a typo.");
+      }
+    }
+  }
+
+  if (foundTeam1Service && priceIsCorrect) {
+    Logger.log("✅ SUCCESS! The system successfully pulled the saved price (1125).");
+    if (isMatchedFlag) Logger.log("✅ SUCCESS! The system correctly flagged it as a Mismatch.");
+  } else {
+    Logger.log("❌ FAILURE. Service not found or Price 0. (Check 'OrderExecution' sheet content)");
+  }
+  
+  // Clean up
+  cleanUpTestRows(testOrderId);
+}
+// Helper to delete test rows after running
+function cleanUpTestRows(orderId) {
+  var ss = getSS();
+  var sheets = ["Order", "OrderScheduled", "OrderExecution"];
+  
+  sheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    var data = sheet.getDataRange().getValues();
+    // Loop backwards to delete safely
+    for (var i = data.length - 1; i >= 0; i--) {
+      // Check column 0 (Order ID) or column 1 (Order ID in Exec sheet)
+      if (String(data[i][0]) == orderId || String(data[i][1]) == orderId) {
+        sheet.deleteRow(i + 1);
+      }
+    }
+  });
+  Logger.log("🧹 Test Data Cleaned Up.");
+}
