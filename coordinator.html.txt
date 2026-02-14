@@ -3,6 +3,7 @@
 
 <head>
     <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css">
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
     <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
@@ -85,10 +86,40 @@
 
                     });
 
-                });
-   
+                });   
             </script>
             <style>
+              /* --- MOBILE VISIBILITY FIXES --- */
+input.input, select, textarea {
+  color: #363636 !important; /* Force dark text */
+  background-color: #ffffff !important; /* Force white background */
+  -webkit-appearance: none;
+  opacity: 1 !important;
+  line-height: 1.5 !important; /* Ensure text isn't vertically cut off */
+}
+.input::placeholder { color: #b5b5b5 !important; }
+.input { color: #363636 !important; }
+
+/* Ensure values are visible in readonly/disabled boxes (like IDs and Names) */
+input.input:disabled, input.input[readonly], .input[readonly] {
+  background-color: #f5f5f5 !important;
+  color: #4a4a4a !important;
+  -webkit-text-fill-color: #4a4a4a !important; /* Critical fix for iOS */
+  opacity: 1 !important;
+}
+
+@media screen and (max-width: 768px) {
+  .input, .select select, .textarea, .selectize-input {
+    font-size: 16px !important; /* Prevents iOS auto-zoom hiding text */
+    height: 45px !important;    /* Larger tap target for fingers */
+  }
+}
+
+.ui-autocomplete {
+  z-index: 10000 !important; /* Keep suggestions on top of modals */
+  background: white !important;
+  border: 1px solid #dbdbdb;
+}
                 #wrap {
                     /*
 		width: 1100px;
@@ -139,6 +170,167 @@
                     border-radius: 6px;
                     box-shadow: 0 1px 2px #C3C3C3;
                 }
+                /* Prevent the Qty input from shrinking when the Unit text appears */
+input[name="qty"] {
+  min-width: 65px !important; /* Forces a minimum width */
+  flex-shrink: 0 !important;   /* Prevents flexbox from squashing it */
+}
+
+/* Style the unit text so it doesn't wrap or overlap */
+span[id$="-unit"], .unit-text {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: #7a7a7a;
+  margin-left: 4px;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Adjust table column for Qty on mobile to give it slightly more room */
+@media screen and (max-width: 768px) {
+  .clean-table th:nth-child(4), 
+  .clean-table td:nth-child(4) {
+    width: 22% !important; /* Increased from 15% to stop shrinking */
+  }
+  
+  /* Slightly shrink the Sub-category columns to compensate */
+  .clean-table th:nth-child(2), 
+  .clean-table th:nth-child(3) {
+    width: 17% !important;
+  }
+}
+/* --- UNIFIED MOBILE REPAIR --- */
+
+@media screen and (max-width: 768px) {
+  /* 1. Reduce the massive 40px padding on the card so we have room to breathe */
+  .invoice-card {
+    padding: 15px !important;
+    margin: 10px auto !important;
+  }
+
+  /* 2. Make the table scrollable so it doesn't break the page width */
+  #table-invoice-item {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 3. Fix the Qty and Unit alignment without squashing */
+  input[name="qty"] {
+    min-width: 60px !important;
+    width: 60px !important;
+    flex: none !important;
+  }
+  
+  .unit-text, span[id$="-unit"] {
+    font-size: 0.7rem;
+    margin-left: 3px;
+  }
+
+  /* 4. Ensure Main/Sub boxes have enough width to be typed in */
+  .clean-table input[name="main"], 
+  .clean-table input[name="sub1"], 
+  .clean-table input[name="sub2"] {
+    min-width: 110px !important;
+  }
+
+  /* 5. Adjust height - 45px was too tall for table rows */
+  .clean-table .input {
+    height: 38px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* --- CURRENCY BOX FIX (Always on) --- */
+/* This prevents "QAR" from overlapping your numbers */
+.control.has-icons-right .input {
+  padding-right: 3.5rem !important;
+}
+.control.has-icons-right .icon.is-right {
+  width: 3.5rem !important;
+  right: 0;
+  justify-content: center;
+  pointer-events: none;
+  color: #4a4a4a !important;
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+/* Fix iOS 'Invisible' text in readonly boxes */
+input:disabled, input[readonly] {
+  -webkit-text-fill-color: #4a4a4a !important; 
+  opacity: 1 !important;
+}
+
+/* =========================================
+   CLEAN UNIFIED MOBILE REPAIR
+   ========================================= */
+
+/* 1. Universal Fix for iOS/Safari 'Invisible' Text */
+input:disabled, 
+input[readonly], 
+.input[readonly], 
+.input:disabled {
+  -webkit-text-fill-color: #4a4a4a !important; 
+  color: #4a4a4a !important;
+  opacity: 1 !important;
+  background-color: #f5f5f5 !important;
+}
+
+/* 2. Fix Currency/Icon boxes (QAR label visibility) */
+.control.has-icons-right .input {
+  padding-right: 3.5rem !important;
+}
+.control.has-icons-right .icon.is-right {
+  width: 3.5rem !important;
+  right: 0 !important;
+  justify-content: center;
+  pointer-events: none;
+  color: #4a4a4a !important;
+  font-weight: bold;
+  display: flex !important;
+}
+
+/* 3. Mobile Specific Layout */
+@media screen and (max-width: 768px) {
+  /* Reduce outer card padding so the table has more screen room */
+  .invoice-card {
+    padding: 15px !important;
+    margin: 10px 5px !important;
+  }
+
+  /* Allow the table to scroll sideways WITHOUT breaking the page width */
+  #table-invoice-item {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #eee;
+    padding-bottom: 10px; /* Space for the scrollbar */
+  }
+
+  /* Prevent the Qty input from being squashed by the Unit text */
+  input[name="qty"] {
+    min-width: 70px !important;
+    width: 70px !important;
+    flex: none !important;
+  }
+
+  /* Ensure Main/Sub category boxes are wide enough to read/type */
+  .clean-table input[name="main"], 
+  .clean-table input[name="sub1"], 
+  .clean-table input[name="sub2"] {
+    min-width: 130px !important;
+  }
+
+  /* Set standard height and font for mobile fingers */
+  .input, .select select, .textarea {
+    font-size: 16px !important; /* Fixes auto-zoom */
+    height: 42px !important;
+  }
+}
             </style>
 
             <!--FULLCALENDAR!-->
@@ -1074,6 +1266,145 @@ body {
 }
 .cc-btn:hover { background-color: #00ACC1; }
 
+/* 1. Fix for iOS 'Invisible' text in readonly boxes */
+input:disabled, input[readonly], .input[readonly] {
+  -webkit-text-fill-color: #4a4a4a !important; 
+  color: #4a4a4a !important;
+  opacity: 1 !important;
+  background-color: #f5f5f5 !important;
+}
+
+/* 2. SPECIFIC FIX FOR SPARE PART / DISCOUNT BOXES (QAR Label) */
+/* This ensures the 'QAR' stays on the right without overlapping your numbers */
+.control.has-icons-right {
+  display: flex !important;
+  align-items: center;
+}
+
+.control.has-icons-right .input {
+  padding-right: 4rem !important; /* Create a 'safe zone' for the QAR text */
+}
+
+.control.has-icons-right .icon.is-right {
+  width: 3.5rem !important;
+  right: 5px !important;
+  pointer-events: none;
+  color: #6B7280 !important;
+  font-weight: 700;
+  font-size: 0.75rem;
+  height: 100%;
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 3. Mobile Specific Adjustments */
+@media screen and (max-width: 768px) {
+  /* Shrink card padding so table/inputs have more room */
+  .invoice-card {
+    padding: 15px !important;
+    margin: 10px 5px !important;
+  }
+
+  /* Keep 'Total Cost' and 'Description' side-by-side on mobile if you want, 
+     OR stack them cleanly. Bulma stacks them. Let's make them clean. */
+  .invoice-card .column {
+    padding-bottom: 10px !important;
+    padding-top: 10px !important;
+  }
+
+  /* Make the service table scrollable WITHOUT breaking the page width */
+  #table-invoice-item {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #eee;
+    margin-bottom: 15px;
+  }
+
+  /* Qty Box Fix */
+  input[name="qty"] {
+    min-width: 65px !important;
+    width: 65px !important;
+    flex: none !important;
+  }
+
+  /* Main/Sub Box Fix */
+  .clean-table input[name="main"], 
+  .clean-table input[name="sub1"], 
+  .clean-table input[name="sub2"] {
+    min-width: 120px !important;
+  }
+
+  /* Set 16px font to stop iPhone from auto-zooming/shaking */
+  .input, .select select, .textarea {
+    font-size: 16px !important;
+    height: 42px !important;
+  }
+  
+  /* Make Labels slightly smaller to fit better */
+  .label {
+    font-size: 0.85rem !important;
+    margin-bottom: 0.3rem !important;
+  }
+}
+/* --- UPDATED MOBILE & HEADER SCROLL FIX --- */
+
+@media screen and (max-width: 768px) {
+  /* 1. Make the Order Details Header scrollable */
+  .dark-header {
+    padding: 15px !important; /* Slightly less padding for mobile */
+  }
+
+  /* Target the container holding Order No, Name, Phone, Team */
+  .dark-header .columns.is-mobile {
+    display: flex !important;
+    overflow-x: auto !important; /* Enable side scrolling */
+    white-space: nowrap !important; /* Keep items on one line */
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 10px; /* Space for thumb scroll */
+    gap: 15px; /* Add breathing room between details */
+  }
+
+  /* Ensure the header items don't shrink too small to read */
+  .dark-header .column.is-3 {
+    flex: 0 0 auto !important; /* Don't allow them to shrink or grow */
+    width: auto !important;    /* Let the content define the width */
+    min-width: 100px;
+  }
+
+  /* 2. Standard Card/Table Fixes (Keep these) */
+  .invoice-card {
+    padding: 15px !important;
+    margin: 10px 5px !important;
+  }
+
+  #table-invoice-item {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #eee;
+  }
+
+  input[name="qty"] {
+    min-width: 65px !important;
+    width: 65px !important;
+    flex: none !important;
+  }
+
+  .clean-table input[name="main"], 
+  .clean-table input[name="sub1"], 
+  .clean-table input[name="sub2"] {
+    min-width: 120px !important;
+  }
+
+  .input, .select select, .textarea {
+    font-size: 16px !important;
+    height: 42px !important;
+  }
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@2.3.2/dist/signature_pad.min.js"></script>
