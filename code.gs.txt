@@ -1,4 +1,4 @@
-  var invoiceSheetUrl = "https://docs.google.com/spreadsheets/d/1WPFLR75pQiA5Z64cclM9DgW9vhfAryk3Z5PITmSP3mg/edit#gid=1405938810";
+var invoiceSheetUrl = "https://docs.google.com/spreadsheets/d/1WPFLR75pQiA5Z64cclM9DgW9vhfAryk3Z5PITmSP3mg/edit#gid=1405938810";
   var TARGET_SPREADSHEET_ID = "1471oX-lRMFNwbmCbcFuPhg2fbbPU662qX2kQFR-r8zc";
 
   var sheetNameServiceList = "Service List";

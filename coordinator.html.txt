@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 
@@ -2815,6 +2814,14 @@ $("#btn-team-logout").unbind("click").click(function() {
         //Hide and protect team page with password
         $('#protected-div-team').hide();
         $('#password-div-team').hide();
+        $('#team-leader-team').on('change', function() {
+        var val = $(this).val();
+        if (val !== "Select team" && val !== "") {
+        $('#password-div-team').fadeIn();
+        } else {
+        $('#password-div-team').hide();
+        }
+        });
 
         $("#button-submit-password-team").click(function() {
 
@@ -3287,7 +3294,7 @@ $("#btn-team-logout").unbind("click").click(function() {
                     // Check if empty before appending to prevent duplicates on refresh
                     if($("#add-order-team option").length <= 1) {
                          $("#add-order-team,#edit-order-team,#calendar-select-team,#multiday-team").append(appendTextTeam);
-                         $("#team-leader-team,.team-selector-team").empty().append('<option>Select team</option>' + appendTextTeam);
+                         $("#team-leader-team,.team-selector-team").empty().append(appendTextTeam);
                     }
 
                     // Past Bookings
